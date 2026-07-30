@@ -13,9 +13,7 @@ CMakeUserPresets.json
 install_manifest.txt
 _CPack_Packages/
 *.zip
-
-# NOT: res/icons/*.ico ve packaging/Assets/*.png BİLEREK depoya dahildir.
-# RC derlemesi onlara bağımlıdır; dışlanırsa depoyu klonlayan projeyi derleyemez.
+*.log
 
 # MSIX
 *.msix
@@ -27,3 +25,12 @@ AppPackages/
 .vs/
 .vscode/
 *.sln
+
+# --- BİLEREK DEPOYA DAHİL EDİLENLER ----------------------------------------
+# Aşağıdakiler ikili dosya olmalarına rağmen dışlanmaz: RC derlemesi ve MSIX
+# paketleme onlara bağımlıdır, dışlanırsa depoyu klonlayan projeyi derleyemez.
+# Negatif kalıplar yalnızca niyeti belgelemek içindir; üstteki hiçbir kural
+# bunları zaten eşlemiyor.
+!res/icons/*.ico
+!packaging/Assets/*.png
+!docs/screenshots/*.png
