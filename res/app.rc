@@ -1,0 +1,372 @@
+// app.rc — KeyLock Indicator kaynak betiği (spec §3.5, §7, §8).
+//
+// UTF-8 olarak kaydedilir. #pragma code_page(65001) olmadan rc.exe dizeleri
+// sistem ANSI kod sayfasıyla okur ve Türkçe karakterler bozulur.
+#pragma code_page(65001)
+
+#include <windows.h>
+#include <commctrl.h>
+
+#include "resource.h"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dile bağlı olmayan kaynaklar. Diyalog ve ikonlar nötr bırakılır: böylece
+// kullanıcının MUI sıralaması ne olursa olsun FindResource daima bulur.
+// Yalnızca STRINGTABLE'lar dile bağlıdır (Localization.cpp blokları dil
+// kimliğiyle doğrudan arar).
+//
+/////////////////////////////////////////////////////////////////////////////
+
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Manifest — linker'ın kendi manifesti /MANIFEST:NO ile kapatıldığı için
+// uygulamanın TEK manifest kaynağı burasıdır (spec §8).
+//
+1                       RT_MANIFEST             "app.manifest"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// İkonlar. IDI_APP ilk sırada: Explorer bir .exe'nin ilk (en küçük kimlikli)
+// ikonunu dosya simgesi olarak kullanır — tray ikonlarından biri öne geçerse
+// kabuk yanlış simgeyi gösterir.
+//
+IDI_APP                 ICON                    "icons/app.ico"
+
+IDI_TRAY_CAPS_OFF_DARK    ICON                  "icons/tray_caps_off_dark.ico"
+IDI_TRAY_CAPS_ON_DARK     ICON                  "icons/tray_caps_on_dark.ico"
+IDI_TRAY_NUM_OFF_DARK     ICON                  "icons/tray_num_off_dark.ico"
+IDI_TRAY_NUM_ON_DARK      ICON                  "icons/tray_num_on_dark.ico"
+IDI_TRAY_SCROLL_OFF_DARK  ICON                  "icons/tray_scroll_off_dark.ico"
+IDI_TRAY_SCROLL_ON_DARK   ICON                  "icons/tray_scroll_on_dark.ico"
+IDI_TRAY_CAPS_OFF_LIGHT   ICON                  "icons/tray_caps_off_light.ico"
+IDI_TRAY_CAPS_ON_LIGHT    ICON                  "icons/tray_caps_on_light.ico"
+IDI_TRAY_NUM_OFF_LIGHT    ICON                  "icons/tray_num_off_light.ico"
+IDI_TRAY_NUM_ON_LIGHT     ICON                  "icons/tray_num_on_light.ico"
+IDI_TRAY_SCROLL_OFF_LIGHT ICON                  "icons/tray_scroll_off_light.ico"
+IDI_TRAY_SCROLL_ON_LIGHT  ICON                  "icons/tray_scroll_on_light.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Sürüm bilgisi. İki dil bloğu da listelenir; Explorer kullanıcının diline
+// uyanı gösterir, bulamazsa ilk bloğa düşer.
+//
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,0
+ PRODUCTVERSION 1,0,0,0
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041F04B0"                        // Türkçe (Türkiye), Unicode
+        BEGIN
+            VALUE "CompanyName",      "ShadesOfDeath"
+            VALUE "FileDescription",  "KeyLock Indicator"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "KeyLockIndicator"
+            VALUE "LegalCopyright",   "© 2026 ShadesOfDeath. Tüm hakları saklıdır."
+            VALUE "OriginalFilename", "KeyLockIndicator.exe"
+            VALUE "ProductName",      "KeyLock Indicator"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+        BLOCK "040904B0"                        // English (US), Unicode
+        BEGIN
+            VALUE "CompanyName",      "ShadesOfDeath"
+            VALUE "FileDescription",  "KeyLock Indicator"
+            VALUE "FileVersion",      "1.0.0.0"
+            VALUE "InternalName",     "KeyLockIndicator"
+            VALUE "LegalCopyright",   "© 2026 ShadesOfDeath. All rights reserved."
+            VALUE "OriginalFilename", "KeyLockIndicator.exe"
+            VALUE "ProductName",      "KeyLock Indicator"
+            VALUE "ProductVersion",   "1.0.0.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x41F, 1200, 0x409, 1200
+    END
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Ayarlar penceresi (spec §4.6). Buradaki metinler yalnızca yer tutucudur:
+// SettingsDialog::ApplyLocalizedText çalışma zamanında IDS_SET_* dizeleriyle
+// hepsini değiştirir. Yine de anlamlı bırakıldılar — kaynak düzenleyicide ve
+// dil yüklemesi başarısız olursa pencere okunabilir kalsın.
+//
+// GROUPBOX YOK. Win32 grup çerçevesi koyu temaya uymaz; hangi tema kurulu olursa
+// olsun parlak "etched" bir dikdörtgen çizer ve koyu zeminde kalın beyaz bir
+// kutu gibi görünür (kullanıcı şikayeti: "çok fazla border"). Onun yerine Rufus
+// düzeni kullanılır: IDC_GRP_* kimlikleri bölüm BAŞLIĞI (LTEXT, büyük harf,
+// vurgulu renk) olur, başlık metninin SAĞINDAN pencere kenarına kadar uzanan
+// 1 piksellik çizgi src/SettingsPaint.cpp içinde (WM_ERASEBKGND) çizilir.
+// Başlık statiği yalnızca metnini kaplayacak şekilde çalışma zamanında
+// kısaltılır (SettingsPaint::LayoutSectionHeaders) — aksi hâlde statiğin kendi
+// zemin dolgusu çizgiyi siler. Şablondaki 284 genişlik yalnızca üst sınırdır.
+// SS_CENTERIMAGE: metin kontrol yüksekliğinde dikey ortalanır, böylece çizgi
+// kontrolün orta çizgisine konduğunda metnin de ortasından geçer.
+//
+// Izgara (DLU): bölüm başlığı x=8 (içerikten hafif dışa taşar), etiket ve onay
+// kutusu kolonu x=14, kontrol kolonu x=110 w=150, sağ kenar 292. Satır adımı 14,
+// kaydırıcı satırları 22, bölümler arası 11. Toplam yükseklik 328 (<= 330).
+// Üç kilit tuşu onay kutusu tek satıra alındı: dikey bütçeyi 26 DLU düşürüyor ve
+// aynı türden üç seçenek Rufus'ta da yan yana durur.
+//
+IDD_SETTINGS DIALOGEX 0, 0, 300, 328
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_DLGMODALFRAME
+CAPTION "KeyLock Indicator - Settings"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    // --- GENEL ---------------------------------------------------------
+    LTEXT           "GENERAL", IDC_GRP_GENERAL, 8, 7, 284, 10,
+                    SS_LEFT | SS_CENTERIMAGE
+    AUTOCHECKBOX    "Show the on-screen display (OSD)", IDC_CHK_SHOWOSD,
+                    14, 22, 266, 10
+    AUTOCHECKBOX    "Start with Windows", IDC_CHK_AUTOSTART,
+                    14, 36, 266, 10
+    LTEXT           "Language:", IDC_LBL_LANGUAGE, 14, 52, 91, 9
+    // COMBOBOX yüksekliği açılır listeyi de kapsar; kapalı kutu yazı tipine göre
+    // ~14 DLU olur, 60 yalnızca listeye yer bırakır.
+    COMBOBOX        IDC_CMB_LANGUAGE, 110, 50, 150, 60,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // --- İZLENEN TUŞLAR ------------------------------------------------
+    LTEXT           "MONITORED KEYS", IDC_GRP_KEYS, 8, 75, 284, 10,
+                    SS_LEFT | SS_CENTERIMAGE
+    AUTOCHECKBOX    "Caps Lock", IDC_CHK_WATCHCAPS, 14, 90, 90, 10
+    AUTOCHECKBOX    "Num Lock", IDC_CHK_WATCHNUM, 110, 90, 90, 10
+    AUTOCHECKBOX    "Scroll Lock", IDC_CHK_WATCHSCROLL, 206, 90, 86, 10
+    LTEXT           "Tray icon:", IDC_LBL_TRAYKEY, 14, 106, 91, 9
+    COMBOBOX        IDC_CMB_TRAYKEY, 110, 104, 150, 60,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // --- OSD GÖRÜNÜMÜ --------------------------------------------------
+    LTEXT           "OSD APPEARANCE", IDC_GRP_OSD, 8, 129, 284, 10,
+                    SS_LEFT | SS_CENTERIMAGE
+    LTEXT           "Visible for:", IDC_LBL_DURATION, 14, 147, 91, 9
+    CONTROL         "", IDC_SLD_DURATION, "msctls_trackbar32",
+                    TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP,
+                    110, 144, 132, 20
+    RTEXT           "1400 ms", IDC_VAL_DURATION, 248, 147, 44, 9
+    LTEXT           "Card opacity:", IDC_LBL_OPACITY, 14, 169, 91, 9
+    CONTROL         "", IDC_SLD_OPACITY, "msctls_trackbar32",
+                    TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP,
+                    110, 166, 132, 20
+    RTEXT           "82 %", IDC_VAL_OPACITY, 248, 169, 44, 9
+    LTEXT           "Position:", IDC_LBL_POSITION, 14, 190, 91, 9
+    COMBOBOX        IDC_CMB_POSITION, 110, 188, 150, 60,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Edge margin:", IDC_LBL_MARGIN, 14, 206, 91, 9
+    EDITTEXT        IDC_EDT_MARGIN, 110, 204, 46, 14,
+                    ES_NUMBER | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+    // Yukarı/aşağı düğmesi buddy'sini z-sırasındaki önceki kontrolden alır;
+    // bu yüzden IDC_EDT_MARGIN hemen üstünde durmalıdır.
+    CONTROL         "", IDC_SPN_MARGIN, "msctls_updown32",
+                    UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS |
+                    UDS_NOTHOUSANDS | WS_TABSTOP,
+                    156, 204, 12, 14
+    LTEXT           "Theme:", IDC_LBL_THEME, 14, 222, 91, 9
+    COMBOBOX        IDC_CMB_THEME, 110, 220, 150, 60,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+
+    // --- DAVRANIŞ ------------------------------------------------------
+    LTEXT           "BEHAVIOR", IDC_GRP_BEHAVIOR, 8, 245, 284, 10,
+                    SS_LEFT | SS_CENTERIMAGE
+    AUTOCHECKBOX    "Hide while a full-screen app is running",
+                    IDC_CHK_SUPPRESSFS, 14, 260, 266, 10
+    AUTOCHECKBOX    "Always show on the primary monitor",
+                    IDC_CHK_PRIMARYONLY, 14, 274, 266, 10
+
+    // --- Alt satır -----------------------------------------------------
+    LTEXT           "Changes take effect immediately; no restart needed.",
+                    IDC_LBL_HINT, 14, 292, 278, 9
+    PUSHBUTTON      "Restore defaults", IDC_BTN_DEFAULTS, 110, 306, 88, 15
+    DEFPUSHBUTTON   "Close", IDC_BTN_CLOSE, 204, 306, 88, 15
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dizeler — Türkçe (spec §7). Her kimlik İKİ tabloda da bulunmalıdır; eksik
+// kimlik Loc::Str'de boş dize olarak döner ve arayüzde boşluk bırakır.
+//
+/////////////////////////////////////////////////////////////////////////////
+
+LANGUAGE LANG_TURKISH, SUBLANG_TURKISH_TURKEY
+
+STRINGTABLE
+BEGIN
+    IDS_APPNAME             "KeyLock Indicator"
+    IDS_KEY_CAPS            "CAPS LOCK"
+    IDS_KEY_NUM             "NUM LOCK"
+    IDS_KEY_SCROLL          "SCROLL LOCK"
+    IDS_STATE_ON            "Açık"
+    IDS_STATE_OFF           "Kapalı"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_MENU_SETTINGS       "Ayarlar"
+    IDS_MENU_AUTOSTART      "Windows ile başlat"
+    IDS_MENU_TOGGLEOSD      "OSD'yi geçici kapat"
+    IDS_MENU_ABOUT          "Hakkında"
+    IDS_MENU_EXIT           "Çıkış"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABOUT_TITLE         "KeyLock Indicator hakkında"
+    IDS_ABOUT_TEXT          "KeyLock Indicator 1.0.0\n\nCaps Lock, Num Lock ve Scroll Lock durumunu ekranın üstünde küçük bir kartla ve bildirim alanı simgesiyle gösterir.\n\nShadesOfDeath"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_OEM_TITLE           "KeyLock Indicator"
+    IDS_OEM_MAIN            "Başka bir tuş göstergesi algılandı"
+    IDS_OEM_BODY            "Cihazınızda üreticinin kendi tuş göstergesi (%s) çalışıyor olabilir. İki gösterge aynı anda çıkarsa OSD'yi kapatıp yalnızca tray ikonunu kullanabilirsiniz."
+    IDS_OEM_DONTSHOW        "Bir daha gösterme"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SET_TITLE           "KeyLock Indicator - Ayarlar"
+    IDS_SET_GRP_GENERAL     "GENEL"
+    IDS_SET_SHOWOSD         "Ekran göstergesini (OSD) göster"
+    IDS_SET_AUTOSTART       "Windows ile başlat"
+    IDS_SET_LANGUAGE        "Dil:"
+    IDS_SET_GRP_KEYS        "İZLENEN TUŞLAR"
+    IDS_SET_WATCHCAPS       "Caps Lock"
+    IDS_SET_WATCHNUM        "Num Lock"
+    IDS_SET_WATCHSCROLL     "Scroll Lock"
+    IDS_SET_TRAYKEY         "Bildirim simgesi:"
+    IDS_SET_GRP_OSD         "OSD GÖRÜNÜMÜ"
+    IDS_SET_DURATION        "Görünme süresi:"
+    IDS_SET_OPACITY         "Kart opaklığı:"
+    IDS_SET_POSITION        "Konum:"
+    IDS_SET_MARGIN          "Kenar boşluğu:"
+    IDS_SET_THEME           "Tema:"
+    IDS_SET_GRP_BEHAVIOR    "DAVRANIŞ"
+    IDS_SET_SUPPRESSFS      "Tam ekran uygulama çalışırken gösterme"
+    IDS_SET_PRIMARYONLY     "Her zaman ana monitörde göster"
+    IDS_SET_DEFAULTS        "Varsayılanlara dön"
+    IDS_SET_CLOSE           "Kapat"
+    IDS_SET_HINT            "Değişiklikler anında uygulanır; yeniden başlatma gerekmez."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_POS_TOP             "Üst"
+    IDS_POS_CENTER          "Orta"
+    IDS_POS_BOTTOM          "Alt"
+    IDS_THEME_SYSTEM        "Sistemle aynı"
+    IDS_THEME_LIGHT         "Açık"
+    IDS_THEME_DARK          "Koyu"
+    IDS_LANG_AUTO           "Otomatik"
+    IDS_LANG_TR             "Türkçe"
+    IDS_LANG_EN             "English"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UNIT_MS             "ms"
+    IDS_UNIT_PERCENT        "%"
+    IDS_UNIT_DIP            "px"
+END
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dizeler — İngilizce (yedek dil). Language=auto ve kullanıcı arayüzü dili
+// Türkçe değilse bu tablo kullanılır.
+//
+/////////////////////////////////////////////////////////////////////////////
+
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+STRINGTABLE
+BEGIN
+    IDS_APPNAME             "KeyLock Indicator"
+    IDS_KEY_CAPS            "CAPS LOCK"
+    IDS_KEY_NUM             "NUM LOCK"
+    IDS_KEY_SCROLL          "SCROLL LOCK"
+    IDS_STATE_ON            "On"
+    IDS_STATE_OFF           "Off"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_MENU_SETTINGS       "Settings"
+    IDS_MENU_AUTOSTART      "Start with Windows"
+    IDS_MENU_TOGGLEOSD      "Pause the OSD"
+    IDS_MENU_ABOUT          "About"
+    IDS_MENU_EXIT           "Exit"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABOUT_TITLE         "About KeyLock Indicator"
+    IDS_ABOUT_TEXT          "KeyLock Indicator 1.0.0\n\nShows the Caps Lock, Num Lock and Scroll Lock state on a small card near the top of the screen and in the notification area.\n\nShadesOfDeath"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_OEM_TITLE           "KeyLock Indicator"
+    IDS_OEM_MAIN            "Another key indicator was detected"
+    IDS_OEM_BODY            "Your device may already be running the manufacturer's own key indicator (%s). If two indicators appear at the same time, you can turn the OSD off and use only the tray icon."
+    IDS_OEM_DONTSHOW        "Don't show this again"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_SET_TITLE           "KeyLock Indicator - Settings"
+    IDS_SET_GRP_GENERAL     "GENERAL"
+    IDS_SET_SHOWOSD         "Show the on-screen display (OSD)"
+    IDS_SET_AUTOSTART       "Start with Windows"
+    IDS_SET_LANGUAGE        "Language:"
+    IDS_SET_GRP_KEYS        "MONITORED KEYS"
+    IDS_SET_WATCHCAPS       "Caps Lock"
+    IDS_SET_WATCHNUM        "Num Lock"
+    IDS_SET_WATCHSCROLL     "Scroll Lock"
+    IDS_SET_TRAYKEY         "Tray icon:"
+    IDS_SET_GRP_OSD         "OSD APPEARANCE"
+    IDS_SET_DURATION        "Visible for:"
+    IDS_SET_OPACITY         "Card opacity:"
+    IDS_SET_POSITION        "Position:"
+    IDS_SET_MARGIN          "Edge margin:"
+    IDS_SET_THEME           "Theme:"
+    IDS_SET_GRP_BEHAVIOR    "BEHAVIOR"
+    IDS_SET_SUPPRESSFS      "Hide while a full-screen app is running"
+    IDS_SET_PRIMARYONLY     "Always show on the primary monitor"
+    IDS_SET_DEFAULTS        "Restore defaults"
+    IDS_SET_CLOSE           "Close"
+    IDS_SET_HINT            "Changes take effect immediately; no restart needed."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_POS_TOP             "Top"
+    IDS_POS_CENTER          "Center"
+    IDS_POS_BOTTOM          "Bottom"
+    IDS_THEME_SYSTEM        "Same as system"
+    IDS_THEME_LIGHT         "Light"
+    IDS_THEME_DARK          "Dark"
+    IDS_LANG_AUTO           "Automatic"
+    IDS_LANG_TR             "Türkçe"
+    IDS_LANG_EN             "English"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_UNIT_MS             "ms"
+    IDS_UNIT_PERCENT        "%"
+    IDS_UNIT_DIP            "px"
+END

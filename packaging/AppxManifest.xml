@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+  AppxManifest.xml — MSIX (Microsoft Store) paket bildirimi (spec §1, §4.7).
+
+  Paket, portable derlemeyle AYNI ikiliyi taşır: uygulama tam güven
+  (Windows.FullTrustApplication) masaüstü köprüsü altında çalışır, bu yüzden
+  runFullTrust kısıtlı yeteneği gerekir.
+
+  "Windows ile başlat" ayarı paketli modda Run anahtarına yazamaz; bunun yerine
+  aşağıdaki windows.startupTask uzantısı kullanılır. TaskId, koddaki
+  src/Autostart.h → kli::Autostart::kStartupTaskId ile birebir aynı olmalıdır
+  ("KeyLockIndicatorStartup"); farklı olursa StartupTask WinRT çağrısı
+  E_INVALIDARG döner ve onay kutusu sessizce çalışmaz.
+
+  Enabled="false": ilk kurulumda otomatik başlatma KAPALIDIR. Kullanıcı
+  ayarlardan açtığında RequestEnableAsync ile etkinleştirilir; Store
+  sertifikasyonu davetsiz otomatik başlatmayı sevmez.
+
+  Assets\ klasöründe bulunması gereken dosyalar (tools/make_icons.ps1 üretir):
+    StoreLogo.png            50 x 50    Properties/Logo, Store listeleme
+    Square44x44Logo.png      44 x 44    Görev çubuğu, uygulama listesi
+    Square71x71Logo.png      71 x 71    Küçük kutucuk
+    Square150x150Logo.png  150 x 150    Orta kutucuk (zorunlu)
+    Square310x310Logo.png  310 x 310    Büyük kutucuk
+    Wide310x150Logo.png    310 x 150    Geniş kutucuk
+    SplashScreen.png       620 x 300    Açılış görseli
+  MakeAppx, aynı adın ".scale-100/125/150/200/400" ekli ölçek çeşitlerini de
+  otomatik toplar; yalnızca ölçek-100 dosyaları zorunludur.
+-->
+
+<Package
+    xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+    xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+    xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+    xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+    xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+    IgnorableNamespaces="uap uap5 desktop rescap">
+
+  <!-- Publisher, imzalama sertifikasının Subject alanıyla AYNI olmalıdır;
+       Store yüklemesinde Partner Center'daki değerle değiştirilir. -->
+  <Identity
+      Name="ShadesOfDeath.KeyLockIndicator"
+      Publisher="CN=ShadesOfDeath"
+      Version="1.0.0.0"
+      ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>KeyLock Indicator</DisplayName>
+    <PublisherDisplayName>ShadesOfDeath</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <!-- MinVersion 17763 (Windows 10 1809): uxtheme koyu mod ordinal'lerinin ve
+       DWMWA_USE_IMMERSIVE_DARK_MODE'un ilk kullanılabildiği sürüm. -->
+  <Dependencies>
+    <TargetDeviceFamily
+        Name="Windows.Desktop"
+        MinVersion="10.0.17763.0"
+        MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <!-- İkilinin içindeki çift dilli STRINGTABLE ile aynı diller (spec §7). -->
+  <Resources>
+    <Resource Language="tr-TR" />
+    <Resource Language="en-US" />
+  </Resources>
+
+  <Applications>
+    <Application
+        Id="KeyLockIndicator"
+        Executable="KeyLockIndicator.exe"
+        EntryPoint="Windows.FullTrustApplication">
+
+      <!-- BackgroundColor="transparent": kutucuk arkaplanı sistem vurgu
+           rengini alır, ikonun kendi zemini olmaz. AppListEntry belirtilmez;
+           varsayılan "default" ile uygulama listesinde görünür. -->
+      <uap:VisualElements
+          DisplayName="KeyLock Indicator"
+          Description="Caps Lock, Num Lock ve Scroll Lock durumunu ekranda gösterir."
+          BackgroundColor="transparent"
+          Square150x150Logo="Assets\Square150x150Logo.png"
+          Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile
+            Square71x71Logo="Assets\Square71x71Logo.png"
+            Square310x310Logo="Assets\Square310x310Logo.png"
+            Wide310x150Logo="Assets\Wide310x150Logo.png" />
+        <!-- Tam güven masaüstü uygulamasında açılış görseli pratikte
+             gösterilmez; şema yine de geçerli bir görsel bekler. -->
+        <uap:SplashScreen
+            Image="Assets\SplashScreen.png"
+            BackgroundColor="#1F1F1F" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap5:Extension
+            Category="windows.startupTask"
+            Executable="KeyLockIndicator.exe"
+            EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask
+              TaskId="KeyLockIndicatorStartup"
+              Enabled="false"
+              DisplayName="KeyLock Indicator" />
+        </uap5:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <!-- runFullTrust kısıtlı yetenektir: Store gönderiminde gerekçe istenir.
+       Gerekçe: uygulama Win32 API'leri (Shell_NotifyIcon, DirectComposition,
+       GetKeyState) kullanan bir masaüstü köprüsü uygulamasıdır. -->
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

@@ -1,0 +1,29 @@
+# Build çıktıları
+build/
+out/
+bin/
+obj/
+*.user
+*.vcxproj*
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+.ninja_deps
+.ninja_log
+install_manifest.txt
+_CPack_Packages/
+*.zip
+
+# NOT: res/icons/*.ico ve packaging/Assets/*.png BİLEREK depoya dahildir.
+# RC derlemesi onlara bağımlıdır; dışlanırsa depoyu klonlayan projeyi derleyemez.
+
+# MSIX
+*.msix
+*.appx
+*.pfx
+AppPackages/
+
+# IDE
+.vs/
+.vscode/
+*.sln
