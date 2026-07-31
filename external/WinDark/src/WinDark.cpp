@@ -126,6 +126,13 @@ void ApplyToControl(HWND hwnd, bool dark) noexcept {
     // CFD ("combobox / edit field") koyu KENARLIK veren tema sınıfıdır.
     // DarkMode_Explorer bu iki sınıfta gövdeyi koyultur ama çerçeveyi parlak
     // bırakır — kullanıcının "kalın beyaz border" olarak gördüğü şey buydu.
+    //
+    // LISTBOX BURADA YOK ve CFD'ye de ALINMADI: ÖLÇÜLDÜ — WS_BORDER'lı bir liste
+    // kutusunun çerçevesini ne DarkMode_Explorer ne de DarkMode_CFD koyultuyor,
+    // her iki hâlde de bembeyaz 1 px kalıyor (çerçeveyi liste kutusunun kendi
+    // NC çizimi yapıyor, tema sınıfı oraya karışmıyor). Çözüm çağıran tarafta:
+    // kontrol WS_BORDER'sız tanımlanır ve çerçeveyi uygulama çizer
+    // (bkz. KeyLockIndicator src/SettingsPaint.cpp, FrameAroundControl).
     const bool isCfd = _wcsicmp(cls, L"ComboBox") == 0 || _wcsicmp(cls, L"Edit") == 0;
     const bool isCommonControl = isCfd || _wcsicmp(cls, L"Button") == 0 ||
                                  _wcsicmp(cls, L"ScrollBar") == 0 ||

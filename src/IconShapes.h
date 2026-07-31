@@ -29,6 +29,11 @@ HRESULT BuildNum(ID2D1Factory1* factory, bool on, Built& out);
 // on=false → açık kilit kancası. on=true → kapalı kanca + dolu gövde.
 HRESULT BuildScroll(ID2D1Factory1* factory, bool on, Built& out);
 
+// Klavye düzeni rozeti (madde 28): konturlu klavye çerçevesi + dolu tuş
+// ızgarası. Kilit tuşlarının aksine "açık/kapalı" hâli YOKTUR; düzen bir durum
+// değil bir kimliktir, o yüzden tek geometri üretilir.
+HRESULT BuildKeyboard(ID2D1Factory1* factory, Built& out);
+
 // Birden fazla path'i tek geometriye toplar (D2D1_FILL_MODE_WINDING).
 HRESULT Group(ID2D1Factory1* factory, ID2D1Geometry** items, UINT count,
               D2D1_FILL_MODE mode, ID2D1Geometry** out);

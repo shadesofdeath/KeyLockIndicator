@@ -17,6 +17,14 @@ constexpr UINT_PTR TIMER_POLL      = 1;  // host pencerede, 70 ms (KeyMonitor)
 constexpr UINT_PTR TIMER_OSD_DWELL = 2;  // OSD pencerede, bekleme süresi sonu
 constexpr UINT_PTR TIMER_OSD_GONE  = 3;  // OSD pencerede, fade-out bitti → gizle
 constexpr UINT_PTR TIMER_OSD_IDLE  = 4;  // OSD pencerede, boşta → cihaz zincirini bırak
+constexpr UINT_PTR TIMER_OSD_BADGE = 5;  // OSD pencerede, kalıcı rozet tam ekran yoklaması
+
+// Kalıcı rozet kipinde tam ekran/sunum durumunun yoklama aralığı (madde 16).
+// Rozet zaten ekranda durduğu için "gösterirken bir kez sor" yetmez; oyun açılıp
+// kapandığında rozetin gitmesi/gelmesi gerekir. 1 s seçildi: gecikme fark edilmez
+// ve SHQueryUserNotificationState saniyede bir çağrılınca ölçülebilir bir CPU
+// maliyeti oluşturmuyor (yoklama yalnızca bu kip açıkken çalışır).
+constexpr UINT kOsdBadgePollMs = 1000;
 
 // Boşta kalma süresi sonunda D3D/D2D/DComp zinciri serbest bırakılır.
 //
@@ -53,6 +61,12 @@ enum TrayCommand : int {
     kCmdToggleOsd     = 40003,
     kCmdAbout         = 40004,
     kCmdExit          = 40005,
+    // Tepsi menüsünde yoktur; Ayarlar penceresi "Konumu ekrandan seç" butonunu
+    // sahibine (host pencere) bu kimlikle iletir — Autostart ile aynı desen.
+    kCmdPickPosition  = 40006,
 };
+
+// Global kısayolun RegisterHotKey kimliği. Tek kısayol var; sabit kimlik yeterli.
+constexpr int kHotkeyId = 1;
 
 }  // namespace kli

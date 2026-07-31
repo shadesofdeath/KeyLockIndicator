@@ -34,3 +34,4 @@ AppPackages/
 !res/icons/*.ico
 !packaging/Assets/*.png
 !docs/screenshots/*.png
+!docs/images/*.png

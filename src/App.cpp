@@ -13,17 +13,9 @@
 
 #include <wtsapi32.h>
 
+#include <cwchar>   // _wcsicmp
+
 namespace kli {
-namespace {
-
-// Proses genelinde tercih edilen uygulama modu. Tepsi menüsü TrackPopupMenu ile
-// çizilir ve hiçbir pencereye bağlı olmadığı için tema yalnızca bu moddan gelir;
-// bu yüzden Ayarlar penceresi hiç açılmasa da açılışta kurulmak zorundadır.
-void ApplyProcessAppMode(bool dark) {
-    WinDark::SetAppMode(dark ? WinDark::AppMode::ForceDark : WinDark::AppMode::ForceLight);
-}
-
-}  // namespace
 
 App::~App() {
     Shutdown();
@@ -92,6 +84,13 @@ bool App::Initialize(HINSTANCE hInstance) {
     m_settings = Settings::Load();
     m_settings.Clamp();
 
+    // Yüksek kontrast, OSD paleti kurulmadan ÖNCE okunmalı: BuildOsdConfig ilk
+    // çağrısında bu bayrağı kullanıyor (madde 29).
+    m_highContrast = HighContrastActive();
+    // Rozetin başlangıç tuşu kullanıcının birincil tuşudur; ilk tuş değişiminde
+    // OnLockChanged bunu değişen tuşla günceller.
+    m_badgeKey = m_settings.trayIconKey;
+
     // Dil, kaynaklardan metin okuyan her şeyden önce kurulmalı.
     Loc::Initialize(hInstance, m_settings.language);
 
@@ -107,17 +106,22 @@ bool App::Initialize(HINSTANCE hInstance) {
     // Tepsi ikonu eklenmeden ÖNCE, sistem teması okunduktan hemen SONRA: menü
     // teması yalnızca app modundan gelir ve ilk sağ tık Ayarlar'dan önce olabilir.
     WinDark::Initialize();
-    const bool dark = (EffectiveTheme() == AppTheme::Dark);
-    ApplyProcessAppMode(dark);
-    WinDark::ApplyToWindow(m_host, dark);
+    ApplyProcessAppMode();
+    WinDark::ApplyToWindow(m_host, EffectiveTheme() == AppTheme::Dark);
 
     // OSD zinciri açılışta hazırlanır; ilk tuş basımında ~200 ms D3D kurulum
     // gecikmesi fark edilir (spec §6). Kurulamazsa uygulama tray modunda sürer.
     if (!m_osd.Create(hInstance)) {
         LogV(L"OsdWindow::Create başarısız — yalnızca tray modunda devam ediliyor");
     }
-    m_osd.SetConfig(BuildOsdConfig());
+    // Yapılandırma ve (gerekiyorsa) monitör başına ek pencereler.
+    RebuildOsdWindows();
     m_osd.OnThemeChanged(EffectiveTheme());
+    for (const auto& win : m_extraOsd) {
+        if (win) {
+            win->OnThemeChanged(EffectiveTheme());
+        }
+    }
 
     if (!m_tray.Add(hInstance, m_host, [this](int c) { OnTrayCommand(c); })) {
         LogV(L"TrayIcon::Add başarısız");
@@ -128,6 +132,16 @@ bool App::Initialize(HINSTANCE hInstance) {
         ::WTSRegisterSessionNotification(m_host, NOTIFY_FOR_THIS_SESSION) != FALSE;
 
     m_keyMonitor.Start(m_host, [this](LockKey k, LockState s) { OnLockChanged(k, s); });
+    // Klavye düzeni izleyicisi kendi zamanlayıcısını KURMAZ; aynı TIMER_POLL
+    // tick'inde yoklanır (madde 28). Açılışta yalnızca mevcut düzeni okur.
+    m_layoutMonitor.Start([this](const KeyboardLayoutInfo& l) { OnLayoutChanged(l); });
+
+    // Kısayol varsayılan olarak KAPALIDIR; açıksa burada kaydedilir.
+    ApplyHotkey();
+
+    // Kalıcı rozet açıksa açılışta HEMEN belirmeli: kullanıcı bir tuşa basana
+    // kadar beklemek "sürekli durur" sözünü tutmazdı (madde 16).
+    RefreshPersistentBadge();
 
     // En son: modal olduğu için kullanıcı akışını bloklamaması gerekir (spec §5).
     OemCheck::WarnOnce(m_host, m_settings.oemWarningShown);
@@ -161,9 +175,17 @@ int App::Run() {
 void App::Shutdown() {
     // İki kez çağrılabilir: Run() sonunda ve yıkıcıda.
     m_keyMonitor.Stop();
+    m_layoutMonitor.Stop();
     m_themeWatcher.Stop();
+    if (m_hotkeyRegistered) {
+        if (m_host != nullptr && ::IsWindow(m_host) != FALSE) {
+            ::UnregisterHotKey(m_host, kHotkeyId);
+        }
+        m_hotkeyRegistered = false;
+    }
     m_settingsDialog.Close();
     m_tray.Remove();
+    m_extraOsd.clear();   // unique_ptr yıkıcıları Destroy'u çağırır
     m_osd.Destroy();
     if (m_sessionNotifyRegistered) {
         if (m_host != nullptr && ::IsWindow(m_host) != FALSE) {
@@ -193,13 +215,29 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
         case WM_TIMER:
             if (wParam == TIMER_POLL) {
                 m_keyMonitor.Tick();
+                // AYNI tick, YENİ İŞ PARÇACIĞI YOK (madde 28). Ayar kapalıyken
+                // izleyici hiç sorgulanmaz: kullanmayan kullanıcı bedel ödemez.
+                if (m_settings.watchKeyboardLayout) {
+                    m_layoutMonitor.Tick();
+                }
                 return 0;
             }
             break;
 
-        case WM_SETTINGCHANGE:
+        case WM_SETTINGCHANGE: {
             m_themeWatcher.OnSettingChange(reinterpret_cast<LPCWSTR>(lParam));
+            // Yüksek kontrast açılıp kapandığında sistem SPI_SETHIGHCONTRAST
+            // yayınlar (madde 29). Bazı sürümler eylem kodu yerine yalnızca
+            // "HighContrast" alan adını gönderdiği için ikisi de kabul edilir.
+            const auto* area = reinterpret_cast<const wchar_t*>(lParam);
+            const bool hcBroadcast =
+                (wParam == static_cast<WPARAM>(SPI_SETHIGHCONTRAST)) ||
+                (area != nullptr && _wcsicmp(area, L"HighContrast") == 0);
+            if (hcBroadcast) {
+                OnHighContrastMaybeChanged();
+            }
             break;
+        }
 
         case WM_KLI_THEMENOTIFY:
             m_themeWatcher.OnRegistryNotify();
@@ -213,10 +251,18 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
             ShowSettings();
             return 0;
 
+        case WM_HOTKEY:
+            if (wParam == static_cast<WPARAM>(kHotkeyId)) {
+                OnHotkey();
+                return 0;
+            }
+            break;
+
         case WM_KLI_RESYNC:
         case WM_WTSSESSION_CHANGE:
             // Sessiz senkron: OSD gösterilmez, yoksa oturum açılışında sahte OSD çıkar.
             m_keyMonitor.Resync();
+            m_layoutMonitor.Resync();
             RefreshTray();
             return 0;
 
@@ -225,12 +271,22 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
             if (wParam == static_cast<WPARAM>(PBT_APMRESUMEAUTOMATIC) ||
                 wParam == static_cast<WPARAM>(PBT_APMRESUMESUSPEND)) {
                 m_keyMonitor.Resync();
+                m_layoutMonitor.Resync();
                 RefreshTray();
             }
             return TRUE;
 
         case WM_DISPLAYCHANGE:
+            // Monitör eklenmiş/çıkarılmış olabilir: "tüm ekranlar" kipinde pencere
+            // sayısı ve sabitlenen tutamaçlar yeniden hesaplanmak zorunda, yoksa
+            // artık var olmayan bir ekrana çakılı pencere kalır.
+            RebuildOsdWindows();
             m_osd.OnDpiOrMonitorChanged();
+            for (const auto& win : m_extraOsd) {
+                if (win) {
+                    win->OnDpiOrMonitorChanged();
+                }
+            }
             break;
 
         case WM_COMMAND:
@@ -248,6 +304,10 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
                 RefreshTray();
                 return 0;
             }
+            if (LOWORD(wParam) == kCmdPickPosition) {
+                BeginPickPosition();
+                return 0;
+            }
             break;
 
         case WM_DESTROY:
@@ -260,140 +320,21 @@ LRESULT App::HandleMessage(UINT msg, WPARAM wParam, LPARAM lParam) {
     return ::DefWindowProcW(m_host, msg, wParam, lParam);
 }
 
-// ---------------------------------------------------------------------------
-// Callback'ler
-// ---------------------------------------------------------------------------
+// Callback bölümü (OnLockChanged / OnLayoutChanged / ForegroundAppExcluded /
+// OnHighContrastMaybeChanged / OnSystemThemeChanged) AppEvents.cpp içindedir
+// (400 satır sınırı, spec §9).
 
-void App::OnLockChanged(LockKey changed, LockState now) {
-    RefreshTray();
-    if (!m_settings.showOsd || !m_settings.Watches(changed)) {
-        return;
-    }
-    // Aynı tick'te birden fazla tuş değişebilir; OsdWindow son geleni gösterir.
-    m_osd.Show(changed, now.Get(changed));
-}
-
-void App::OnSystemThemeChanged(AppTheme theme) {
-    if (m_settings.themeMode != ThemeMode::System) {
-        LogV(L"Sistem teması değişti (%d) ama ThemeMode sabit — yok sayılıyor",
-             static_cast<int>(theme));
-        return;
-    }
-    ApplyProcessAppMode(theme == AppTheme::Dark);  // tepsi menüsü de anında dönsün
-    m_osd.OnThemeChanged(theme);
-    RefreshTray();
-    m_settingsDialog.OnThemeChanged(theme);
-}
-
-void App::OnTrayCommand(int commandId) {
-    switch (commandId) {
-        case 0:
-            // Sol tık tuşu değiştirmez, yalnızca anlık OSD gösterir (spec §4.5).
-            m_osd.Show(m_settings.trayIconKey,
-                       m_keyMonitor.Current().Get(m_settings.trayIconKey));
-            break;
-
-        case kCmdSettings:
-            ShowSettings();
-            break;
-
-        case kCmdAutostart:
-            Autostart::SetEnabled(!Autostart::IsEnabled());
-            RefreshTray();
-            break;
-
-        case kCmdToggleOsd:
-            m_settings.showOsd = !m_settings.showOsd;
-            m_settings.Save();
-            ApplySettingsToModules(false);
-            if (m_settingsDialog.IsOpen()) {
-                m_settingsDialog.SyncFrom(m_settings);
-            }
-            break;
-
-        case kCmdAbout:
-            ShowAbout();
-            break;
-
-        case kCmdExit:
-            // WM_DESTROY → PostQuitMessage; temizlik Run() sonunda.
-            ::DestroyWindow(m_host);
-            break;
-
-        default:
-            LogV(L"Bilinmeyen tray komutu: %d", commandId);
-            break;
-    }
-}
-
-void App::OnSettingsApplied(const Settings& next) {
-    if (next.language != m_settings.language) {
-        Loc::SetLanguage(next.language);
-    }
-    m_settings = next;
-    m_settings.Save();
-    ApplySettingsToModules(true);
-}
-
-// ---------------------------------------------------------------------------
-// Yardımcılar
-// ---------------------------------------------------------------------------
-
-void App::ApplySettingsToModules(bool trayIconMayChange) {
-    // RefreshTray koşulsuz tazeler; bayrak yalnızca çağıranın niyetini belgeler.
-    (void)trayIconMayChange;
-
-    // Tema kipi ayarlardan da değişebilir (Sistem/Açık/Koyu); menü buna bağlı.
-    ApplyProcessAppMode(EffectiveTheme() == AppTheme::Dark);
-    m_osd.SetConfig(BuildOsdConfig());
-    m_osd.OnThemeChanged(EffectiveTheme());
-    if (!m_settings.showOsd) {
-        m_osd.HideImmediate();
-    }
-    RefreshTray();
-}
-
-void App::RefreshTray() {
-    m_tray.SetMenuState(m_settings.showOsd, Autostart::IsEnabled(),
-                        Autostart::IsDisabledByPolicy());
-    m_tray.Update(m_keyMonitor.Current(), m_settings.trayIconKey, EffectiveTheme());
-}
-
-void App::ShowSettings() {
-    m_settingsDialog.Show(m_instance, m_host, m_settings,
-                          [this](const Settings& s) { OnSettingsApplied(s); });
-    m_settingsDialog.OnThemeChanged(EffectiveTheme());
-
-    // Autostart Settings'te saklanmaz; kutu gerçek kaynaktan senkronlanır.
-    const HWND dlg = m_settingsDialog.Handle();
-    const HWND chk = (dlg != nullptr) ? ::GetDlgItem(dlg, IDC_CHK_AUTOSTART) : nullptr;
-    if (chk == nullptr) {
-        return;
-    }
-    ::SendMessageW(chk, BM_SETCHECK,
-                   Autostart::IsEnabled() ? BST_CHECKED : BST_UNCHECKED, 0);
-    ::EnableWindow(chk, Autostart::IsDisabledByPolicy() ? FALSE : TRUE);
-}
-
-void App::ShowAbout() {
-    ::MessageBoxW(m_host, Loc::Str(IDS_ABOUT_TEXT).c_str(),
-                  Loc::Str(IDS_ABOUT_TITLE).c_str(), MB_OK | MB_ICONINFORMATION);
-}
+// OnTrayCommand / OnTrayLeftClick / OnSettingsApplied / ApplySettingsToModules /
+// RefreshTray / BuildOsdConfig / ShowSettings / ShowAbout AppCommands.cpp
+// içindedir (400 satır sınırı, spec §9).
 
 AppTheme App::EffectiveTheme() const {
     return m_settings.ResolveTheme(m_themeWatcher.Current());
 }
 
-OsdConfig App::BuildOsdConfig() const {
-    OsdConfig cfg{};
-    cfg.durationMs = m_settings.osdDurationMs;
-    // OsdPlacement ile OsdPositionMode sayısal olarak birebir; çeviri App'te (spec §2).
-    cfg.placement = static_cast<OsdPlacement>(static_cast<int>(m_settings.osdPosition));
-    cfg.topMarginDip = m_settings.osdTopMarginDip;
-    cfg.primaryMonitorOnly = m_settings.primaryMonitorOnly;
-    cfg.suppressFullscreen = m_settings.suppressFullscreen;
-    cfg.cardAlpha = m_settings.CardAlphaFor(EffectiveTheme());
-    return cfg;
+void App::ApplyProcessAppMode() const {
+    WinDark::SetAppMode(EffectiveTheme() == AppTheme::Dark ? WinDark::AppMode::ForceDark
+                                                           : WinDark::AppMode::ForceLight);
 }
 
 }  // namespace kli

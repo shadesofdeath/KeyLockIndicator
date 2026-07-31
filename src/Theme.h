@@ -36,7 +36,19 @@ struct OsdPalette {
 
 // cardAlpha: 0.60 – 1.00 aralığında, ayarlardan gelir. Varsayılanlar tema
 // başına farklıdır (koyu 0.82 / açık 0.85) ve Settings tarafında tutulur.
-[[nodiscard]] OsdPalette MakePalette(AppTheme theme, float cardAlpha) noexcept;
+//
+// highContrast=true (madde 29): tablolar TAMAMEN devre dışı kalır ve renkler
+// sistemin yüksek kontrast paletinden (GetSysColor) türetilir; kart tam opak
+// olur, cardAlpha yok sayılır ve gölge alfası sıfırlanır. Gerekçe: yüksek
+// kontrast kipinin tek amacı okunabilirliktir, saydam bir kart ve yumuşak bir
+// gölge o amacı doğrudan bozar.
+[[nodiscard]] OsdPalette MakePalette(AppTheme theme, float cardAlpha,
+                                     bool highContrast) noexcept;
+
+// Sistemin yüksek kontrast kipi açık mı (SPI_GETHIGHCONTRAST → HCF_HIGHCONTRASTON).
+// Sorgu başarısızsa false döner: yanlış pozitif, kullanıcının seçtiği temayı
+// sebepsiz ezmek demek olurdu.
+[[nodiscard]] bool HighContrastActive() noexcept;
 
 // Ayarlarda saklanan yüzde değeri (60–100) → kart alfası.
 [[nodiscard]] inline float OpacityPercentToAlpha(unsigned percent) noexcept {

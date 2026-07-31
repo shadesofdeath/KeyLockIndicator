@@ -33,19 +33,33 @@ add_subdirectory(external/WinDark)
 set(KLI_SOURCES
     src/main.cpp
     src/App.cpp
+    src/AppCommands.cpp
+    src/AppEvents.cpp
+    src/AppFilter.cpp
     src/KeyMonitor.cpp
+    src/LayoutMonitor.cpp
     src/ThemeWatcher.cpp
     src/MonitorUtil.cpp
     src/IconGeometry.cpp
     src/IconShapes.cpp
     src/OsdRenderer.cpp
+    src/OsdText.cpp
     src/OsdWindow.cpp
     src/OsdDevice.cpp
     src/OsdAnimation.cpp
+    src/OsdPosition.cpp
+    src/OsdBadge.cpp
+    src/OsdShow.cpp
+    src/ScreenReader.cpp
     src/TrayIcon.cpp
+    src/HotkeyBox.cpp
     src/Settings.cpp
+    src/SettingsStore.cpp
     src/SettingsDialog.cpp
+    src/SettingsFields.cpp
+    src/SettingsExclude.cpp
     src/SettingsPaint.cpp
+    src/AboutDialog.cpp
     src/Autostart.cpp
     src/OemCheck.cpp
     src/Localization.cpp
@@ -54,21 +68,29 @@ set(KLI_SOURCES
 )
 
 set(KLI_HEADERS
+    src/AboutDialog.h
     src/App.h
+    src/AppFilter.h
     src/Autostart.h
+    src/HotkeyBox.h
     src/IconGeometry.h
     src/IconShapes.h
     src/KeyMonitor.h
+    src/LayoutMonitor.h
     src/Localization.h
     src/LockTypes.h
     src/Messages.h
     src/MonitorUtil.h
     src/OemCheck.h
+    src/OsdMetrics.h
     src/OsdRenderer.h
     src/OsdWindow.h
+    src/ScreenReader.h
     src/Settings.h
     src/SettingsDialog.h
+    src/SettingsFields.h
     src/SettingsPaint.h
+    src/SettingsStore.h
     src/Theme.h
     src/ThemeWatcher.h
     src/TrayIcon.h
@@ -142,7 +164,12 @@ target_link_libraries(keylock-indicator PRIVATE
     comctl32
     wtsapi32          # WTSRegisterSessionNotification (spec §6)
     dxguid            # CLSID_D2D1Shadow, d2d1effects.h'de DEFINE_GUID ile bildirilir
+    oleaut32          # SysAllocString/SysFreeString — UIA duyurusunun BSTR'leri
+    comdlg32          # GetOpenFileNameW/GetSaveFileNameW (madde 18, 32)
+    shlwapi           # SHLoadIndirectString — klavye düzeni adı (madde 28)
 )
+# uiautomationcore.lib BİLEREK bağlanmaz: duyuru API'si çalışma zamanında
+# LoadLibrary ile çözülür (bkz. src/ScreenReader.cpp gerekçesi).
 
 if(KLI_PACKAGED)
     # StartupTask WinRT API'si (ham ABI ile; C++/WinRT bağımlılığı yok)

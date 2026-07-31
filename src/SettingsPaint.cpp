@@ -15,10 +15,36 @@ namespace kli {
 namespace SettingsPaint {
 namespace {
 
-// IDD_SETTINGS'teki dört bölüm başlığı. Hem vurgu rengi hem ayırıcı konumu bu
-// tablodan türer; kaynak yerleşimi değişse de kod uyum sağlar.
-constexpr int kSectionIds[] = {IDC_GRP_GENERAL, IDC_GRP_KEYS, IDC_GRP_OSD,
-                               IDC_GRP_BEHAVIOR};
+// IDD_SETTINGS'teki bölüm başlıkları. Hem vurgu rengi hem ayırıcı konumu bu
+// tablodan türer.
+//
+// IDD_SETTINGS artık İKİ KOLONLUDUR: ayırıcı çizgi pencerenin sağ kenarına
+// kadar değil, başlığın ait olduğu KOLONUN sağ kenarına kadar uzanmalıdır —
+// aksi hâlde sol kolonun çizgisi sağ kolonun kontrollerinin üstünden geçerdi.
+// Bu yüzden her başlığın şablondaki x + genişlik değeri (DLU) burada tekrarlanır
+// ve MapDialogRect ile piksele çevrilir; sabit bir DLU→px oranı varsayılmaz,
+// dönüşümü diyaloğun kendi taban birimleri yapar.
+struct SectionSpec {
+    int id;
+    int xDlu;
+    int widthDlu;
+};
+
+constexpr SectionSpec kSections[] = {
+    {IDC_GRP_GENERAL,  8, 286},
+    {IDC_GRP_KEYS,     8, 286},
+    {IDC_GRP_BEHAVIOR, 8, 286},
+    {IDC_GRP_OSD,    306, 282},
+    {IDC_GRP_EXCLUDE, 306, 282},
+};
+
+// Bölümün piksel cinsinden sol/sağ sınırı. MapDialogRect diyaloğun yazı tipi ve
+// DPI'sını hesaba katar, bu yüzden her ölçekte doğrudur.
+[[nodiscard]] bool SectionBoundsPx(HWND dlg, const SectionSpec& spec, RECT& out) noexcept {
+    out = RECT{static_cast<LONG>(spec.xDlu), 0,
+               static_cast<LONG>(spec.xDlu + spec.widthDlu), 8};
+    return ::MapDialogRect(dlg, &out) != FALSE;
+}
 
 // Başlık metninin sağ kenarı ile çizginin başlangıcı arasındaki boşluk.
 constexpr float kLineGapDip = 6.0f;
@@ -33,10 +59,40 @@ constexpr float kTextPadDip = 2.0f;
     return dark ? RGB(64, 64, 64) : RGB(210, 210, 210);
 }
 
+// Liste kutusunun çerçevesi. Ayırıcıdan bir tık belirgin: bu bir bölüm sınırı
+// değil, kontrolün kendi sınırıdır ve kullanıcı nereye tıklayacağını görmeli.
+[[nodiscard]] COLORREF ControlBorderColor(bool dark) noexcept {
+    return dark ? RGB(84, 84, 84) : RGB(160, 160, 160);
+}
+
+// Kontrolün DIŞ kenarına 1 piksellik çerçeve çizer. Kontrolün kendi WS_BORDER'ı
+// yoktur (bkz. app.rc IDC_LST_EXCLUDE notu); bu 1 piksel diyaloğun zeminine
+// aittir, dolayısıyla WM_ERASEBKGND'de çizilir ve kontrol onu ezemez.
+void FrameAroundControl(HWND dlg, HDC hdc, int ctrlId, HBRUSH brush) {
+    const HWND ctrl = ::GetDlgItem(dlg, ctrlId);
+    RECT rc{};
+    if (ctrl == nullptr || brush == nullptr || !::GetWindowRect(ctrl, &rc)) {
+        return;
+    }
+    POINT topLeft{rc.left, rc.top};
+    POINT bottomRight{rc.right, rc.bottom};
+    if (!::ScreenToClient(dlg, &topLeft) || !::ScreenToClient(dlg, &bottomRight)) {
+        return;
+    }
+    RECT frame{topLeft.x - 1, topLeft.y - 1, bottomRight.x + 1, bottomRight.y + 1};
+    ::FrameRect(hdc, &frame, brush);
+}
+
 // Bölüm başlığı gövde metninden bir tık daha parlak/koyu — renk değil kontrast
 // vurgusu, böylece başlıklar tema rengine bağlı kalmadan öne çıkar.
 [[nodiscard]] COLORREF HeaderTextColor(bool dark) noexcept {
     return dark ? RGB(235, 235, 235) : RGB(20, 20, 20);
+}
+
+// Kısayol çakışması uyarısı. Koyu zeminde saf kırmızı okunmaz; tema başına
+// kontrastı tutan iki ton kullanılır.
+[[nodiscard]] COLORREF WarningTextColor(bool dark) noexcept {
+    return dark ? RGB(240, 120, 120) : RGB(176, 32, 32);
 }
 
 [[nodiscard]] UINT DialogDpi(HWND dlg) noexcept {
@@ -79,27 +135,34 @@ private:
 
 // Kontrol kimliği IDD_SETTINGS bölüm başlıklarından biri mi?
 [[nodiscard]] bool IsSectionHeader(int ctrlId) noexcept {
-    for (const int id : kSectionIds) {
-        if (id == ctrlId) {
+    for (const SectionSpec& spec : kSections) {
+        if (spec.id == ctrlId) {
             return true;
         }
     }
     return false;
 }
 
-// Bölüm başlığı vurgulu, IDC_LBL_HINT soluk çizilir. Renk hdc'ye yazıldıysa true
-// döner; diğer statiklerde WinDark'ın varsayılan metin rengi korunur.
+// Bölüm başlığı vurgulu, IDC_LBL_HINT soluk, kısayol uyarısı kırmızı çizilir.
+// Renk hdc'ye yazıldıysa true döner; diğer statiklerde WinDark'ın varsayılan
+// metin rengi korunur.
 [[nodiscard]] bool OverrideStaticColor(HDC hdc, int ctrlId, bool dark) {
     if (hdc == nullptr) {
         return false;
     }
     const bool header = IsSectionHeader(ctrlId);
-    if (!header && ctrlId != IDC_LBL_HINT) {
+    if (!header && ctrlId != IDC_LBL_HINT && ctrlId != IDC_LBL_HOTKEYWARN) {
         return false;
     }
     // Zemin WM_ERASEBKGND'de boyandı; metnin arkasına ayrıca blok çizilmesin.
     SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, header ? HeaderTextColor(dark) : WinDark::DisabledTextColor(dark));
+    if (header) {
+        SetTextColor(hdc, HeaderTextColor(dark));
+    } else if (ctrlId == IDC_LBL_HOTKEYWARN) {
+        SetTextColor(hdc, WarningTextColor(dark));
+    } else {
+        SetTextColor(hdc, WinDark::DisabledTextColor(dark));
+    }
     return true;
 }
 
@@ -114,8 +177,8 @@ void LayoutSectionHeaders(HWND dlg) {
         return;
     }
     const int pad = DipToPx(kTextPadDip, DialogDpi(dlg));
-    for (const int id : kSectionIds) {
-        const HWND head = ::GetDlgItem(dlg, id);
+    for (const SectionSpec& spec : kSections) {
+        const HWND head = ::GetDlgItem(dlg, spec.id);
         if (head == nullptr) {
             continue;
         }
@@ -125,10 +188,21 @@ void LayoutSectionHeaders(HWND dlg) {
         if (len <= 0 || !::GetWindowRect(head, &rc)) {
             continue;
         }
-        const int width = TextWidthPx(dc.get(), head, text, len) + pad;
-        const int limit = static_cast<int>(rc.right - rc.left);
-        if (width <= pad || width >= limit) {
-            continue;  // ölçüm başarısız ya da metin şablona sığmıyor: dokunma
+        RECT bounds{};
+        if (!SectionBoundsPx(dlg, spec, bounds)) {
+            continue;
+        }
+        // Üst sınır kontrolün ANLIK genişliği DEĞİL, ŞABLONUN bıraktığı yerdir.
+        // Anlık genişlik kullanılırsa bir kez daraltılan başlık daha UZUN bir
+        // çeviriye geçildiğinde bir daha genişleyemez ve metin kırpılır — dil
+        // canlı değişince "GENERAL" yerine "GENER" görünürdü.
+        const int limit = static_cast<int>(bounds.right - bounds.left);
+        int width = TextWidthPx(dc.get(), head, text, len) + pad;
+        if (width <= pad || limit <= pad) {
+            continue;  // ölçüm başarısız ya da kullanılabilir alan yok: dokunma
+        }
+        if (width > limit) {
+            width = limit;  // çeviri şablona sığmıyor: taşırmak yerine sınıra oturt
         }
         ::SetWindowPos(head, nullptr, 0, 0, width, static_cast<int>(rc.bottom - rc.top),
                        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -154,28 +228,36 @@ void Background(HWND dlg, HDC hdc, bool dark) {
 
     const int gap = DipToPx(kLineGapDip, DialogDpi(dlg));
 
-    // Çizgiler başlık kontrolünün GERÇEK dikdörtgeninden türer: DLU→piksel
-    // dönüşümü tekrarlanmaz, her DPI'da ve her yerleşim değişikliğinde hizalı
-    // kalır. LayoutSectionHeaders statiği metnine kadar daralttığı için rc.right
-    // metnin sağ kenarıdır.
-    for (const int id : kSectionIds) {
-        const HWND head = GetDlgItem(dlg, id);
+    // Çizginin BAŞLANGICI başlık kontrolünün gerçek dikdörtgeninden gelir
+    // (LayoutSectionHeaders statiği metnine kadar daralttığı için rc.right
+    // metnin sağ kenarıdır), BİTİŞİ ise başlığın ait olduğu kolonun sağ
+    // kenarından — iki kolonlu yerleşimde pencere kenarı yanlış olurdu.
+    for (const SectionSpec& spec : kSections) {
+        const HWND head = GetDlgItem(dlg, spec.id);
         RECT rc{};
         if (head == nullptr || !GetWindowRect(head, &rc)) {
             continue;
         }
-        POINT start{rc.right, (rc.top + rc.bottom) / 2};
-        POINT inset{rc.left, start.y};
-        if (!ScreenToClient(dlg, &start) || !ScreenToClient(dlg, &inset)) {
+        RECT bounds{};
+        if (!SectionBoundsPx(dlg, spec, bounds)) {
             continue;
         }
-        // Sağ kenar payı başlığın sol payıyla eşitlenir; çizgi alt butonlarla
-        // aynı hizada biter.
-        const RECT sep{start.x + gap, start.y, client.right - inset.x, start.y + 1};
+        POINT start{rc.right, (rc.top + rc.bottom) / 2};
+        if (!ScreenToClient(dlg, &start)) {
+            continue;
+        }
+        const RECT sep{start.x + gap, start.y, bounds.right, start.y + 1};
         if (sep.left >= sep.right) {
             continue;
         }
         FillRect(hdc, &sep, line.get());
+    }
+
+    // İstisna listesinin çerçevesi (madde 18). Kontrolün kendi WS_BORDER'ı
+    // koyu temada beyaz kaldığı için çerçeve buradan çizilir.
+    const unique_hbrush border(CreateSolidBrush(ControlBorderColor(dark)));
+    if (border) {
+        FrameAroundControl(dlg, hdc, IDC_LST_EXCLUDE, border.get());
     }
 }
 

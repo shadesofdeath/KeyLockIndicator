@@ -42,6 +42,21 @@ enum class Backend {
     Unavailable,   // Bu derlemede karşılığı yok
 };
 
+// TAŞINABİLİR KİP (madde 25) VE OTOMATİK BAŞLATMA — SEÇİLEN YOL: Run anahtarı
+// KULLANILMAYA DEVAM EDER, özellik devre dışı BIRAKILMAZ.
+//
+// Gerekçe: "taşınabilir" olan ayarların saklandığı yerdir, işletim sisteminin
+// oturum açılışında ne çalıştıracağı değil. Windows'ta bir uygulamayı oturumla
+// başlatmanın kullanıcı düzeyindeki tek yolu HKCU\...\Run'dır (paketli
+// derlemede StartupTask); "portable" bir exe için bunun dosya tabanlı bir
+// karşılığı yoktur. Özelliği kapatmak, USB'den çalıştırdığı programı her açılışta
+// elle başlatmak zorunda kalan kullanıcıya hiçbir şey kazandırmazdı — kayıt
+// defterine tek bir değer yazmak zaten geri alınabilir bir işlemdir ve
+// "Windows ile başlat" kutusu kapatıldığında değer silinir.
+//
+// Kullanıcı bunu bilmeli: Ayarlar penceresindeki depo satırı (IDC_LBL_STORAGE)
+// taşınabilir kipte otomatik başlatmanın yine kayıt defterini kullandığını
+// açıkça yazar.
 [[nodiscard]] Backend SelectBackend() {
 #ifdef KLI_PACKAGED
     // Paketli derleme paketsiz çalıştırılabilir (geliştirme/CI); o hâlde Run

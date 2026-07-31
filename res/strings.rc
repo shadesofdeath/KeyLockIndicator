@@ -1,0 +1,32 @@
+// strings.rc — Tüm arayüz dizeleri, dil başına bir STRINGTABLE (spec §7).
+//
+// app.rc tarafından #include edilir; #pragma code_page(65001) orada kurulduğu
+// için buradaki UTF-8 metinler doğru okunur.
+//
+// DİLİN TEK DOĞRULUK KAYNAĞI src/Localization.cpp içindeki kLanguages tablosudur.
+// Buradaki LANGUAGE bildirimleri o tablodaki LANGID değerleriyle BİREBİR
+// aynı olmak zorundadır: Loc::Str, FindResourceExW ile TAM LANGID araması yapar.
+// pt-BR ile pt-PT ve zh-CN ile zh-TW yalnızca alt dille (SUBLANG) ayrıştığı için
+// bu eşleşme kritiktir — yanlış alt dil, sessizce yanlış tabloyu getirir.
+//
+// KURAL: res/resource.h içindeki HER IDS_* kimliği HER tabloda bulunmalıdır.
+// Eksik kimlik Loc::Str'de boş dize olarak döner ve arayüzde boşluk bırakır.
+//
+// BİÇİM DİZELERİ: IDS_ABOUT_VERSION, IDS_OEM_BODY ve IDS_STORAGE_PORTABLE
+// _snwprintf_s/TaskDialog tarafından BİÇİM olarak kullanılır. Bu üç dizede
+// "%s" dışında YÜZDE İŞARETİ BULUNAMAZ; başıboş bir % biçim belirteci sayılır.
+//
+// Dosya dört parçaya bölündü; bölünme yalnızca okunabilirlik içindir, rc.exe
+// için hepsi tek bir betiktir.
+//   strings_core.rc  tr en de fr es it
+//   strings_west.rc  pt-BR pt-PT nl sv da nb fi
+//   strings_east.rc  ru uk pl cs sk hu ro el
+//   strings_asia.rc  ja ko zh-CN zh-TW
+//
+// SAĞDAN SOLA diller (ar/he/fa) BİLEREK YOKTUR: yerleşimin aynalanması gerekir
+// ve yarım yapılmış bir RTL desteği hiç olmamasından kötüdür.
+
+#include "strings_core.rc"
+#include "strings_west.rc"
+#include "strings_east.rc"
+#include "strings_asia.rc"

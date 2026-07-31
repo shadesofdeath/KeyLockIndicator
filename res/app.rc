@@ -104,269 +104,228 @@ END
 // hepsini değiştirir. Yine de anlamlı bırakıldılar — kaynak düzenleyicide ve
 // dil yüklemesi başarısız olursa pencere okunabilir kalsın.
 //
+// GÖREV 4 — İKİ KOLON. Görev 3 sonunda pencere 310 x 407 DLU idi ve tek kolon
+// hâlinde dikey olarak sınıra dayanmıştı: %150 ölçekli 1080p bir ekranın çalışma
+// alanına ZATEN sığmıyordu. Bu turda dört yeni denetim daha geliyor (istisna
+// listesi + iki buton, klavye düzeni onay kutusu, depo satırı, dışa/içe aktarma),
+// yani tek kolonda ~500 DLU olurdu.
+//
+// NEDEN SEKME (SysTabControl32) DEĞİL: SysTabControl32 sekme başlıklarını
+// uxtheme ile kendisi çizer, WM_CTLCOLOR* sormaz ve koyu temada açık gri bir
+// şerit bırakır — HotkeyBox.h'de belgelenen msctls_hotkey32 sorununun aynısı.
+// Düzeltmesi owner-draw sekme çizimi olurdu; bu, dört yeni denetim eklemek için
+// orantısız bir iş. İki kolon ise hem sorunu tamamen ortadan kaldırıyor hem de
+// yüksekliği 407 → 294 DLU'ya indiriyor (%28 kısalma) ve Rufus'un tek sayfalık,
+// yoğun düzenine sekmelerden daha yakın duruyor.
+//
+// IZGARA (DLU):
+//   Sol kolon : başlık x=8   w=286 (8..294) ; içerik x=14, etiket w=88,
+//               kontrol kolonu x=106 w=188
+//   Sağ kolon : başlık x=306 w=282 (306..588) ; içerik x=312, etiket w=88,
+//               kontrol kolonu x=404
+//   Kolonlar arası boşluk 12 DLU, pencere kenar payı 8 DLU (her iki yanda eşit).
+//   Alt şerit tam genişliktedir (14..588) ve iki kolonun altında yer alır.
+//
 // GROUPBOX YOK. Win32 grup çerçevesi koyu temaya uymaz; hangi tema kurulu olursa
 // olsun parlak "etched" bir dikdörtgen çizer ve koyu zeminde kalın beyaz bir
 // kutu gibi görünür (kullanıcı şikayeti: "çok fazla border"). Onun yerine Rufus
 // düzeni kullanılır: IDC_GRP_* kimlikleri bölüm BAŞLIĞI (LTEXT, büyük harf,
-// vurgulu renk) olur, başlık metninin SAĞINDAN pencere kenarına kadar uzanan
+// vurgulu renk) olur, başlık metninin SAĞINDAN KOLONUN sağ kenarına kadar uzanan
 // 1 piksellik çizgi src/SettingsPaint.cpp içinde (WM_ERASEBKGND) çizilir.
 // Başlık statiği yalnızca metnini kaplayacak şekilde çalışma zamanında
 // kısaltılır (SettingsPaint::LayoutSectionHeaders) — aksi hâlde statiğin kendi
-// zemin dolgusu çizgiyi siler. Şablondaki 284 genişlik yalnızca üst sınırdır.
-// SS_CENTERIMAGE: metin kontrol yüksekliğinde dikey ortalanır, böylece çizgi
-// kontrolün orta çizgisine konduğunda metnin de ortasından geçer.
+// zemin dolgusu çizgiyi siler. SS_CENTERIMAGE: metin kontrol yüksekliğinde dikey
+// ortalanır, böylece çizgi kontrolün orta çizgisine konduğunda metnin de
+// ortasından geçer.
 //
-// Izgara (DLU): bölüm başlığı x=8 (içerikten hafif dışa taşar), etiket ve onay
-// kutusu kolonu x=14, kontrol kolonu x=110 w=150, sağ kenar 292. Satır adımı 14,
-// kaydırıcı satırları 22, bölümler arası 11. Toplam yükseklik 328 (<= 330).
-// Üç kilit tuşu onay kutusu tek satıra alındı: dikey bütçeyi 26 DLU düşürüyor ve
-// aynı türden üç seçenek Rufus'ta da yan yana durur.
+// SEKME SIRASI şablon sırasıdır: sol kolon yukarıdan aşağı, sonra sağ kolon,
+// sonra alt şerit. İki kolonlu bir sayfada okuma sırası budur.
 //
-IDD_SETTINGS DIALOGEX 0, 0, 300, 328
+// ÇEVİRİ PAYI: onay kutusu metinleri 24 dile çevrildiği için tek satırlık
+// kutular bilerek TAM KOLON genişliğinde (280 DLU) bırakıldı; yan yana duran
+// tek çift (Caps/Num/Scroll üçlüsü dışında) "OSD göster" + "Windows ile başlat"
+// ikilisidir ve ikisi de kısa metinlerdir.
+//
+IDD_SETTINGS DIALOGEX 0, 0, 596, 294
 STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_DLGMODALFRAME
 CAPTION "KeyLock Indicator - Settings"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
+    // ===================== SOL KOLON =====================
     // --- GENEL ---------------------------------------------------------
-    LTEXT           "GENERAL", IDC_GRP_GENERAL, 8, 7, 284, 10,
+    LTEXT           "GENERAL", IDC_GRP_GENERAL, 8, 7, 286, 10,
                     SS_LEFT | SS_CENTERIMAGE
     AUTOCHECKBOX    "Show the on-screen display (OSD)", IDC_CHK_SHOWOSD,
-                    14, 22, 266, 10
+                    14, 22, 140, 10
     AUTOCHECKBOX    "Start with Windows", IDC_CHK_AUTOSTART,
-                    14, 36, 266, 10
-    LTEXT           "Language:", IDC_LBL_LANGUAGE, 14, 52, 91, 9
-    // COMBOBOX yüksekliği açılır listeyi de kapsar; kapalı kutu yazı tipine göre
-    // ~14 DLU olur, 60 yalnızca listeye yer bırakır.
-    COMBOBOX        IDC_CMB_LANGUAGE, 110, 50, 150, 60,
+                    158, 22, 136, 10
+    LTEXT           "Language:", IDC_LBL_LANGUAGE, 14, 38, 88, 9
+    // COMBOBOX yüksekliği açılır listeyi de kapsar; 25 dil için 200 DLU verilir
+    // (yaklaşık 14 öğe görünür, kalanı kaydırılır — WS_VSCROLL zaten var).
+    COMBOBOX        IDC_CMB_LANGUAGE, 106, 36, 188, 200,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Tray left click:", IDC_LBL_TRAYCLICK, 14, 54, 88, 9
+    COMBOBOX        IDC_CMB_TRAYCLICK, 106, 52, 188, 60,
                     CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
     // --- İZLENEN TUŞLAR ------------------------------------------------
-    LTEXT           "MONITORED KEYS", IDC_GRP_KEYS, 8, 75, 284, 10,
+    LTEXT           "MONITORED KEYS", IDC_GRP_KEYS, 8, 75, 286, 10,
                     SS_LEFT | SS_CENTERIMAGE
-    AUTOCHECKBOX    "Caps Lock", IDC_CHK_WATCHCAPS, 14, 90, 90, 10
-    AUTOCHECKBOX    "Num Lock", IDC_CHK_WATCHNUM, 110, 90, 90, 10
-    AUTOCHECKBOX    "Scroll Lock", IDC_CHK_WATCHSCROLL, 206, 90, 86, 10
-    LTEXT           "Tray icon:", IDC_LBL_TRAYKEY, 14, 106, 91, 9
-    COMBOBOX        IDC_CMB_TRAYKEY, 110, 104, 150, 60,
+    AUTOCHECKBOX    "Caps Lock", IDC_CHK_WATCHCAPS, 14, 90, 92, 10
+    AUTOCHECKBOX    "Num Lock", IDC_CHK_WATCHNUM, 108, 90, 92, 10
+    AUTOCHECKBOX    "Scroll Lock", IDC_CHK_WATCHSCROLL, 202, 90, 92, 10
+    LTEXT           "Tray icon:", IDC_LBL_TRAYKEY, 14, 106, 88, 9
+    COMBOBOX        IDC_CMB_TRAYKEY, 106, 104, 188, 60,
                     CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // Klavye düzeni bildirimi (madde 28). Kilit tuşlarıyla aynı gruptadır:
+    // ikisi de "hangi klavye olayları izlensin" sorusunun cevabıdır.
+    AUTOCHECKBOX    "Notify when the keyboard layout changes",
+                    IDC_CHK_WATCHLAYOUT, 14, 122, 280, 10
 
-    // --- OSD GÖRÜNÜMÜ --------------------------------------------------
-    LTEXT           "OSD APPEARANCE", IDC_GRP_OSD, 8, 129, 284, 10,
+    // --- DAVRANIŞ ------------------------------------------------------
+    LTEXT           "BEHAVIOR", IDC_GRP_BEHAVIOR, 8, 143, 286, 10,
                     SS_LEFT | SS_CENTERIMAGE
-    LTEXT           "Visible for:", IDC_LBL_DURATION, 14, 147, 91, 9
+    AUTOCHECKBOX    "Hide while a full-screen app is running",
+                    IDC_CHK_SUPPRESSFS, 14, 158, 280, 10
+    AUTOCHECKBOX    "Announce to screen reader",
+                    IDC_CHK_ANNOUNCE, 14, 172, 280, 10
+    LTEXT           "Show on:", IDC_LBL_MONITOR, 14, 188, 88, 9
+    COMBOBOX        IDC_CMB_MONITOR, 106, 186, 188, 60,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // Kısayol satırı. Kutu SALT OKUNUR bir EDIT'tir; basılan kombinasyonu
+    // src/HotkeyBox.cpp yakalar. comctl32'nin msctls_hotkey32 sınıfı bilerek
+    // kullanılmadı: zeminini GetSysColor(COLOR_WINDOW) ile boyar, WM_CTLCOLOR*
+    // sormaz ve koyu temada beyaz bir kutu olarak kalır (bkz. HotkeyBox.h).
+    AUTOCHECKBOX    "Global hotkey", IDC_CHK_HOTKEY, 14, 206, 88, 10
+    EDITTEXT        IDC_HOT_SHORTCUT, 106, 204, 188, 14,
+                    ES_READONLY | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
+    // Çakışma uyarısı; normalde BOŞTUR, yalnızca RegisterHotKey başarısız olunca
+    // dolar (SettingsDialog::SetHotkeyWarning).
+    LTEXT           "", IDC_LBL_HOTKEYWARN, 14, 222, 280, 18,
+                    SS_LEFT | SS_NOPREFIX
+
+    // ===================== SAĞ KOLON =====================
+    // --- OSD GÖRÜNÜMÜ --------------------------------------------------
+    LTEXT           "OSD APPEARANCE", IDC_GRP_OSD, 306, 7, 282, 10,
+                    SS_LEFT | SS_CENTERIMAGE
+    LTEXT           "Visible for:", IDC_LBL_DURATION, 312, 25, 88, 9
     CONTROL         "", IDC_SLD_DURATION, "msctls_trackbar32",
                     TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP,
-                    110, 144, 132, 20
-    RTEXT           "1400 ms", IDC_VAL_DURATION, 248, 147, 44, 9
-    LTEXT           "Card opacity:", IDC_LBL_OPACITY, 14, 169, 91, 9
+                    404, 22, 130, 18
+    RTEXT           "1400 ms", IDC_VAL_DURATION, 538, 25, 50, 9
+    LTEXT           "Card opacity:", IDC_LBL_OPACITY, 312, 45, 88, 9
     CONTROL         "", IDC_SLD_OPACITY, "msctls_trackbar32",
                     TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP,
-                    110, 166, 132, 20
-    RTEXT           "82 %", IDC_VAL_OPACITY, 248, 169, 44, 9
-    LTEXT           "Position:", IDC_LBL_POSITION, 14, 190, 91, 9
-    COMBOBOX        IDC_CMB_POSITION, 110, 188, 150, 60,
+                    404, 42, 130, 18
+    RTEXT           "82 %", IDC_VAL_OPACITY, 538, 45, 50, 9
+    LTEXT           "Card size:", IDC_LBL_SCALE, 312, 65, 88, 9
+    CONTROL         "", IDC_SLD_SCALE, "msctls_trackbar32",
+                    TBS_HORZ | TBS_AUTOTICKS | WS_TABSTOP,
+                    404, 62, 130, 18
+    RTEXT           "100 %", IDC_VAL_SCALE, 538, 65, 50, 9
+    LTEXT           "Position:", IDC_LBL_POSITION, 312, 84, 88, 9
+    // 3x3 ızgara + serbest konum = 10 öğe; yükseklik açılır listeyi de kapsadığı
+    // için 140 verilir, yoksa liste dört öğeden sonra kaydırma ister.
+    COMBOBOX        IDC_CMB_POSITION, 404, 82, 96, 140,
                     CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    LTEXT           "Edge margin:", IDC_LBL_MARGIN, 14, 206, 91, 9
-    EDITTEXT        IDC_EDT_MARGIN, 110, 204, 46, 14,
+    // Buton 74 DEĞİL 84 DLU: Almanca "Position wählen..." canlı pencerede
+    // ölçüldüğünde 74 DLU'luk kutuyu tamamen dolduruyor, pay kalmıyordu.
+    // Açılır liste karşılığında 10 DLU daralttı; en uzun konum öğesi Türkçe
+    // "Özel (sürüklenen konum)" ve 96 DLU'ya rahat sığıyor.
+    PUSHBUTTON      "Pick on screen...", IDC_BTN_PICKPOS, 504, 81, 84, 14
+    LTEXT           "Edge margin:", IDC_LBL_MARGIN, 312, 102, 88, 9
+    // Kutu 36 DLU: dört haneye (en fazla 400) bol bol yeter.
+    EDITTEXT        IDC_EDT_MARGIN, 404, 100, 36, 14,
                     ES_NUMBER | ES_AUTOHSCROLL | WS_BORDER | WS_TABSTOP
     // Yukarı/aşağı düğmesi buddy'sini z-sırasındaki önceki kontrolden alır;
     // bu yüzden IDC_EDT_MARGIN hemen üstünde durmalıdır.
     CONTROL         "", IDC_SPN_MARGIN, "msctls_updown32",
                     UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS |
                     UDS_NOTHOUSANDS | WS_TABSTOP,
-                    156, 204, 12, 14
-    LTEXT           "Theme:", IDC_LBL_THEME, 14, 222, 91, 9
-    COMBOBOX        IDC_CMB_THEME, 110, 220, 150, 60,
+                    440, 100, 12, 14
+    AUTOCHECKBOX    "Only when switched on", IDC_CHK_ONLYON, 458, 102, 130, 10
+    LTEXT           "Theme:", IDC_LBL_THEME, 312, 120, 88, 9
+    COMBOBOX        IDC_CMB_THEME, 404, 118, 184, 60,
                     CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    // Görünüm kipi (madde 13–15) + kalıcı rozet (madde 16) aynı satırda.
+    LTEXT           "View:", IDC_LBL_VIEWMODE, 312, 138, 88, 9
+    COMBOBOX        IDC_CMB_VIEWMODE, 404, 136, 88, 80,
+                    CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    AUTOCHECKBOX    "Persistent badge", IDC_CHK_BADGE, 498, 138, 90, 10
 
-    // --- DAVRANIŞ ------------------------------------------------------
-    LTEXT           "BEHAVIOR", IDC_GRP_BEHAVIOR, 8, 245, 284, 10,
+    // --- DIŞLANAN UYGULAMALAR (madde 18) -------------------------------
+    LTEXT           "EXCLUDED APPS", IDC_GRP_EXCLUDE, 306, 163, 282, 10,
                     SS_LEFT | SS_CENTERIMAGE
-    AUTOCHECKBOX    "Hide while a full-screen app is running",
-                    IDC_CHK_SUPPRESSFS, 14, 260, 266, 10
-    AUTOCHECKBOX    "Always show on the primary monitor",
-                    IDC_CHK_PRIMARYONLY, 14, 274, 266, 10
+    // Liste kutusu WS_VSCROLL ile: en fazla 64 öğe olabilir (Settings::
+    // kMaxExcludedApps) ama kutuya dördü sığar. LBS_NOTIFY olmadan LBN_SELCHANGE
+    // gelmez ve "Kaldır" butonunun etkinliği güncellenemezdi.
+    //
+    // WS_BORDER BİLEREK YOK. Ölçüldü: WS_BORDER'lı bir liste kutusu koyu temada
+    // bembeyaz 1 px'lik bir çerçeveyle kalıyor ve ne DarkMode_Explorer ne de
+    // DarkMode_CFD bunu düzeltiyor (çerçeveyi kontrolün kendi NC çizimi yapıyor).
+    // Çerçeve bunun yerine SettingsPaint::Background içinde, tema renginde ve
+    // kontrolün DIŞ kenarına çizilir — bölüm ayırıcılarıyla aynı desen.
+    LISTBOX         IDC_LST_EXCLUDE, 312, 178, 190, 56,
+                    LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Add...", IDC_BTN_EXCL_ADD, 506, 178, 82, 14
+    PUSHBUTTON      "Remove", IDC_BTN_EXCL_DEL, 506, 196, 82, 14
 
-    // --- Alt satır -----------------------------------------------------
+    // ===================== ALT ŞERİT (tam genişlik) =====================
+    // Ayarların nerede saklandığı (madde 25). Taşınabilir kipte .ini dosyasının
+    // TAM YOLUNU yazar, o yüzden SS_PATHELLIPSIS: uzun yol ortadan kısaltılır.
+    LTEXT           "", IDC_LBL_STORAGE, 14, 244, 574, 9,
+                    SS_LEFT | SS_NOPREFIX | SS_PATHELLIPSIS
     LTEXT           "Changes take effect immediately; no restart needed.",
-                    IDC_LBL_HINT, 14, 292, 278, 9
-    PUSHBUTTON      "Restore defaults", IDC_BTN_DEFAULTS, 110, 306, 88, 15
-    DEFPUSHBUTTON   "Close", IDC_BTN_CLOSE, 204, 306, 88, 15
+                    IDC_LBL_HINT, 14, 256, 574, 9, SS_LEFT | SS_NOPREFIX
+    PUSHBUTTON      "Export...", IDC_BTN_EXPORT, 14, 270, 86, 15
+    PUSHBUTTON      "Import...", IDC_BTN_IMPORT, 104, 270, 86, 15
+    PUSHBUTTON      "Restore defaults", IDC_BTN_DEFAULTS, 414, 270, 86, 15
+    DEFPUSHBUTTON   "Close", IDC_BTN_CLOSE, 504, 270, 84, 15
 END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Dizeler — Türkçe (spec §7). Her kimlik İKİ tabloda da bulunmalıdır; eksik
-// kimlik Loc::Str'de boş dize olarak döner ve arayüzde boşluk bırakır.
+// Hakkında penceresi (IDD_ABOUT). MessageBox yerine kendi diyaloğumuz: koyu
+// temada başlık çubuğu da koyu olur ve uygulama simgesi 48 DIP olarak görünür.
 //
-/////////////////////////////////////////////////////////////////////////////
-
-LANGUAGE LANG_TURKISH, SUBLANG_TURKISH_TURKEY
-
-STRINGTABLE
+// Simge statiği SS_ICON | SS_REALSIZECONTROL ile tanımlanır: SS_REALSIZECONTROL
+// olmadan statik kontrol kendini simgenin doğal boyutuna küçültür ve DPI'ya göre
+// yüklenen 48 DIP'lik simge 32 piksele düşer. Kontrolün karesi DLU'da tam kare
+// olmadığı için (yatay/dikey taban birimleri farklıdır) AboutDialog kontrolü
+// çalışma zamanında piksel cinsinden kareye oturtur.
+//
+IDD_ABOUT DIALOGEX 0, 0, 230, 150
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About KeyLock Indicator"
+FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
-    IDS_APPNAME             "KeyLock Indicator"
-    IDS_KEY_CAPS            "CAPS LOCK"
-    IDS_KEY_NUM             "NUM LOCK"
-    IDS_KEY_SCROLL          "SCROLL LOCK"
-    IDS_STATE_ON            "Açık"
-    IDS_STATE_OFF           "Kapalı"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_MENU_SETTINGS       "Ayarlar"
-    IDS_MENU_AUTOSTART      "Windows ile başlat"
-    IDS_MENU_TOGGLEOSD      "OSD'yi geçici kapat"
-    IDS_MENU_ABOUT          "Hakkında"
-    IDS_MENU_EXIT           "Çıkış"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_ABOUT_TITLE         "KeyLock Indicator hakkında"
-    IDS_ABOUT_TEXT          "KeyLock Indicator 1.0.0\n\nCaps Lock, Num Lock ve Scroll Lock durumunu ekranın üstünde küçük bir kartla ve bildirim alanı simgesiyle gösterir.\n\nShadesOfDeath"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_OEM_TITLE           "KeyLock Indicator"
-    IDS_OEM_MAIN            "Başka bir tuş göstergesi algılandı"
-    IDS_OEM_BODY            "Cihazınızda üreticinin kendi tuş göstergesi (%s) çalışıyor olabilir. İki gösterge aynı anda çıkarsa OSD'yi kapatıp yalnızca tray ikonunu kullanabilirsiniz."
-    IDS_OEM_DONTSHOW        "Bir daha gösterme"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_SET_TITLE           "KeyLock Indicator - Ayarlar"
-    IDS_SET_GRP_GENERAL     "GENEL"
-    IDS_SET_SHOWOSD         "Ekran göstergesini (OSD) göster"
-    IDS_SET_AUTOSTART       "Windows ile başlat"
-    IDS_SET_LANGUAGE        "Dil:"
-    IDS_SET_GRP_KEYS        "İZLENEN TUŞLAR"
-    IDS_SET_WATCHCAPS       "Caps Lock"
-    IDS_SET_WATCHNUM        "Num Lock"
-    IDS_SET_WATCHSCROLL     "Scroll Lock"
-    IDS_SET_TRAYKEY         "Bildirim simgesi:"
-    IDS_SET_GRP_OSD         "OSD GÖRÜNÜMÜ"
-    IDS_SET_DURATION        "Görünme süresi:"
-    IDS_SET_OPACITY         "Kart opaklığı:"
-    IDS_SET_POSITION        "Konum:"
-    IDS_SET_MARGIN          "Kenar boşluğu:"
-    IDS_SET_THEME           "Tema:"
-    IDS_SET_GRP_BEHAVIOR    "DAVRANIŞ"
-    IDS_SET_SUPPRESSFS      "Tam ekran uygulama çalışırken gösterme"
-    IDS_SET_PRIMARYONLY     "Her zaman ana monitörde göster"
-    IDS_SET_DEFAULTS        "Varsayılanlara dön"
-    IDS_SET_CLOSE           "Kapat"
-    IDS_SET_HINT            "Değişiklikler anında uygulanır; yeniden başlatma gerekmez."
-END
-
-STRINGTABLE
-BEGIN
-    IDS_POS_TOP             "Üst"
-    IDS_POS_CENTER          "Orta"
-    IDS_POS_BOTTOM          "Alt"
-    IDS_THEME_SYSTEM        "Sistemle aynı"
-    IDS_THEME_LIGHT         "Açık"
-    IDS_THEME_DARK          "Koyu"
-    IDS_LANG_AUTO           "Otomatik"
-    IDS_LANG_TR             "Türkçe"
-    IDS_LANG_EN             "English"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_UNIT_MS             "ms"
-    IDS_UNIT_PERCENT        "%"
-    IDS_UNIT_DIP            "px"
+    CONTROL         "", IDC_ABOUT_ICON, "Static", SS_ICON | SS_REALSIZECONTROL,
+                    14, 14, 29, 24
+    // Ad, diyalog yazı tipinden büyük bir fontla çizilir (AboutDialog::CreateNameFont);
+    // 17 DLU yükseklik 14 puntonun satır yüksekliğini karşılar, SS_CENTERIMAGE
+    // metni bu kutunun dikey ortasına oturtur.
+    LTEXT           "KeyLock Indicator", IDC_ABOUT_NAME, 56, 13, 160, 17,
+                    SS_LEFT | SS_CENTERIMAGE | SS_NOPREFIX
+    LTEXT           "Version 1.0.0", IDC_ABOUT_VERSION, 56, 32, 160, 9,
+                    SS_LEFT | SS_NOPREFIX
+    LTEXT           "", IDC_ABOUT_DESC, 14, 54, 202, 46, SS_LEFT | SS_NOPREFIX
+    LTEXT           "", IDC_ABOUT_AUTHOR, 14, 104, 202, 18, SS_LEFT | SS_NOPREFIX
+    DEFPUSHBUTTON   "OK", IDC_ABOUT_OK, 86, 128, 58, 15
 END
 
 /////////////////////////////////////////////////////////////////////////////
 //
-// Dizeler — İngilizce (yedek dil). Language=auto ve kullanıcı arayüzü dili
-// Türkçe değilse bu tablo kullanılır.
+// Dizeler (spec §7). Yirmi dört dilin STRINGTABLE kümeleri AYRI bir dosyadadır:
+// res/strings.rc. Sebep ölçüsel — 24 dil x 91 kimlik = 2184 satır, uygulamanın
+// asıl kaynak betiğini (diyalog yerleşimi, ikonlar, manifest, sürüm bilgisi)
+// tamamen görünmez hâle getirirdi. Ayrı dosya rc.exe için de aynıdır: #include
+// edilen .rc satır satır aynı derleyiciden geçer, ek bir adım yoktur.
+//
+// KURAL: res/resource.h içindeki HER IDS_* kimliği, strings.rc'deki HER dil
+// tablosunda bulunmak zorundadır. Eksik kimlik Loc::Str'de boş dize olarak
+// döner ve arayüzde sessizce boşluk bırakır.
 //
 /////////////////////////////////////////////////////////////////////////////
 
-LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
-
-STRINGTABLE
-BEGIN
-    IDS_APPNAME             "KeyLock Indicator"
-    IDS_KEY_CAPS            "CAPS LOCK"
-    IDS_KEY_NUM             "NUM LOCK"
-    IDS_KEY_SCROLL          "SCROLL LOCK"
-    IDS_STATE_ON            "On"
-    IDS_STATE_OFF           "Off"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_MENU_SETTINGS       "Settings"
-    IDS_MENU_AUTOSTART      "Start with Windows"
-    IDS_MENU_TOGGLEOSD      "Pause the OSD"
-    IDS_MENU_ABOUT          "About"
-    IDS_MENU_EXIT           "Exit"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_ABOUT_TITLE         "About KeyLock Indicator"
-    IDS_ABOUT_TEXT          "KeyLock Indicator 1.0.0\n\nShows the Caps Lock, Num Lock and Scroll Lock state on a small card near the top of the screen and in the notification area.\n\nShadesOfDeath"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_OEM_TITLE           "KeyLock Indicator"
-    IDS_OEM_MAIN            "Another key indicator was detected"
-    IDS_OEM_BODY            "Your device may already be running the manufacturer's own key indicator (%s). If two indicators appear at the same time, you can turn the OSD off and use only the tray icon."
-    IDS_OEM_DONTSHOW        "Don't show this again"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_SET_TITLE           "KeyLock Indicator - Settings"
-    IDS_SET_GRP_GENERAL     "GENERAL"
-    IDS_SET_SHOWOSD         "Show the on-screen display (OSD)"
-    IDS_SET_AUTOSTART       "Start with Windows"
-    IDS_SET_LANGUAGE        "Language:"
-    IDS_SET_GRP_KEYS        "MONITORED KEYS"
-    IDS_SET_WATCHCAPS       "Caps Lock"
-    IDS_SET_WATCHNUM        "Num Lock"
-    IDS_SET_WATCHSCROLL     "Scroll Lock"
-    IDS_SET_TRAYKEY         "Tray icon:"
-    IDS_SET_GRP_OSD         "OSD APPEARANCE"
-    IDS_SET_DURATION        "Visible for:"
-    IDS_SET_OPACITY         "Card opacity:"
-    IDS_SET_POSITION        "Position:"
-    IDS_SET_MARGIN          "Edge margin:"
-    IDS_SET_THEME           "Theme:"
-    IDS_SET_GRP_BEHAVIOR    "BEHAVIOR"
-    IDS_SET_SUPPRESSFS      "Hide while a full-screen app is running"
-    IDS_SET_PRIMARYONLY     "Always show on the primary monitor"
-    IDS_SET_DEFAULTS        "Restore defaults"
-    IDS_SET_CLOSE           "Close"
-    IDS_SET_HINT            "Changes take effect immediately; no restart needed."
-END
-
-STRINGTABLE
-BEGIN
-    IDS_POS_TOP             "Top"
-    IDS_POS_CENTER          "Center"
-    IDS_POS_BOTTOM          "Bottom"
-    IDS_THEME_SYSTEM        "Same as system"
-    IDS_THEME_LIGHT         "Light"
-    IDS_THEME_DARK          "Dark"
-    IDS_LANG_AUTO           "Automatic"
-    IDS_LANG_TR             "Türkçe"
-    IDS_LANG_EN             "English"
-END
-
-STRINGTABLE
-BEGIN
-    IDS_UNIT_MS             "ms"
-    IDS_UNIT_PERCENT        "%"
-    IDS_UNIT_DIP            "px"
-END
+#include "strings.rc"

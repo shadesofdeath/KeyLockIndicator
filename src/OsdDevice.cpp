@@ -118,7 +118,9 @@ HRESULT OsdWindow::CreateDeviceChain() {
 
     HR(m_renderer.CreateDeviceIndependentResources(m_d2dFactory.Get(),
                                                    m_dwriteFactory.Get()));
-    m_renderer.SetTheme(m_theme, m_config.cardAlpha);
+    m_renderer.SetTheme(m_theme, m_config.cardAlpha, m_config.highContrast);
+    m_renderer.SetScale(m_config.scale);
+    m_renderer.SetView(m_config.view);
     HR(m_renderer.CreateDeviceResources(m_d2dContext.Get()));
 
     // Gizli doğar: opaklık sıfırda tutulur, ilk Show animasyonu 0'dan başlatır.
@@ -127,7 +129,8 @@ HRESULT OsdWindow::CreateDeviceChain() {
 
     // Yüzey henüz yok; ilk PositionForCurrentMonitor doğru DPI ile oluşturur.
     m_surfaceDpi = 0;
-    m_surfacePx = 0;
+    m_surfaceW = 0;
+    m_surfaceH = 0;
     m_deviceChainValid = true;
     return S_OK;
 }
@@ -166,7 +169,8 @@ void OsdWindow::ReleaseDeviceChain() {
     m_d3dDevice.Reset();
 
     m_surfaceDpi = 0;
-    m_surfacePx = 0;
+    m_surfaceW = 0;
+    m_surfaceH = 0;
     m_deviceChainValid = false;
 }
 
@@ -181,29 +185,34 @@ HRESULT OsdWindow::EnsureSurface(UINT dpi) {
     if (dpi == 0) {
         dpi = kDefaultDpi;
     }
-    if (m_surface && dpi == m_surfaceDpi) {
+
+    // Karşılaştırma DPI ile DEĞİL sonuç piksel boyutuyla yapılır: boyut çarpanı
+    // (OsdConfig::scale) ve görünüm kipi (OsdConfig::view) DPI sabit kalsa da
+    // yüzeyi değiştirir. Minimal çubuk kipinde yüzey KARE DEĞİLDİR.
+    const int pxW = DipToPx(SurfaceWidthDip(), dpi);
+    const int pxH = DipToPx(SurfaceHeightDip(), dpi);
+    if (pxW <= 0 || pxH <= 0) {
+        return E_INVALIDARG;
+    }
+    const UINT width = static_cast<UINT>(pxW);
+    const UINT height = static_cast<UINT>(pxH);
+    if (m_surface && dpi == m_surfaceDpi && width == m_surfaceW && height == m_surfaceH) {
         return S_OK;
     }
 
-    const int px = DipToPx(OsdLayout::kSurfaceSize, dpi);
-    if (px <= 0) {
-        return E_INVALIDARG;
-    }
-    const UINT side = static_cast<UINT>(px);
-
-    HR(m_dcompDevice->CreateSurface(side, side, DXGI_FORMAT_B8G8R8A8_UNORM,
+    HR(m_dcompDevice->CreateSurface(width, height, DXGI_FORMAT_B8G8R8A8_UNORM,
                                     DXGI_ALPHA_MODE_PREMULTIPLIED,
                                     m_surface.ReleaseAndGetAddressOf()));
     HR(m_visual->SetContent(m_surface.Get()));
 
     // Ölçek merkezi yüzeyin ortası — giriş animasyonu kartın merkezinden büyür
     // (spec §3.6 "merkez orijinli"). DComp dönüşümleri fiziksel piksel uzayındadır.
-    const float center = static_cast<float>(side) * 0.5f;
-    HR(m_scale->SetCenterX(center));
-    HR(m_scale->SetCenterY(center));
+    HR(m_scale->SetCenterX(static_cast<float>(width) * 0.5f));
+    HR(m_scale->SetCenterY(static_cast<float>(height) * 0.5f));
 
     m_surfaceDpi = dpi;
-    m_surfacePx = side;
+    m_surfaceW = width;
+    m_surfaceH = height;
     HR(m_dcompDevice->Commit());
     return S_OK;
 }

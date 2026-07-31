@@ -27,27 +27,84 @@ LANGID s_langId = static_cast<LANGID>(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_U
 
 constexpr unsigned kStringsPerBlock = 16;
 
+constexpr LANGID kEnglishUs =
+    static_cast<LANGID>(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+
+// Desteklenen diller. Sıra Ayarlar'daki açılır listenin sırasıdır: "auto" ilk,
+// ardından kodun alfabetik sırası (kullanıcı listeyi böyle tarar).
+//
+// SUBLANG SEÇİMİ res/strings.rc ile BİREBİR aynı olmak zorundadır; FindResourceEx
+// tam LANGID ile arar. pt-BR/pt-PT ve zh-CN/zh-TW çiftleri yalnızca alt dille
+// ayrıştığı için bu eşleşme kritiktir.
+//
+// SAĞDAN SOLA diller (ar/he/fa) BİLEREK YOKTUR: yerleşimin aynalanması
+// (WS_EX_LAYOUTRTL + tüm kontrol koordinatlarının çevrilmesi) gerekir ve yarım
+// yapılmış bir RTL desteği, hiç olmamasından daha kötü bir deneyim verir.
+constexpr Language kLanguages[] = {
+    {L"auto",  nullptr,        0},
+    {L"cs",    L"Čeština",     MAKELANGID(LANG_CZECH, SUBLANG_CZECH_CZECH_REPUBLIC)},
+    {L"da",    L"Dansk",       MAKELANGID(LANG_DANISH, SUBLANG_DANISH_DENMARK)},
+    {L"de",    L"Deutsch",     MAKELANGID(LANG_GERMAN, SUBLANG_GERMAN)},
+    {L"el",    L"Ελληνικά",    MAKELANGID(LANG_GREEK, SUBLANG_GREEK_GREECE)},
+    {L"en",    L"English",     MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US)},
+    {L"es",    L"Español",     MAKELANGID(LANG_SPANISH, SUBLANG_SPANISH)},
+    {L"fi",    L"Suomi",       MAKELANGID(LANG_FINNISH, SUBLANG_FINNISH_FINLAND)},
+    {L"fr",    L"Français",    MAKELANGID(LANG_FRENCH, SUBLANG_FRENCH)},
+    {L"hu",    L"Magyar",      MAKELANGID(LANG_HUNGARIAN, SUBLANG_HUNGARIAN_HUNGARY)},
+    {L"it",    L"Italiano",    MAKELANGID(LANG_ITALIAN, SUBLANG_ITALIAN)},
+    {L"ja",    L"日本語",       MAKELANGID(LANG_JAPANESE, SUBLANG_JAPANESE_JAPAN)},
+    {L"ko",    L"한국어",       MAKELANGID(LANG_KOREAN, SUBLANG_KOREAN)},
+    {L"nb",    L"Norsk bokmål", MAKELANGID(LANG_NORWEGIAN, SUBLANG_NORWEGIAN_BOKMAL)},
+    {L"nl",    L"Nederlands",  MAKELANGID(LANG_DUTCH, SUBLANG_DUTCH)},
+    {L"pl",    L"Polski",      MAKELANGID(LANG_POLISH, SUBLANG_POLISH_POLAND)},
+    {L"pt-BR", L"Português (Brasil)",
+                               MAKELANGID(LANG_PORTUGUESE, SUBLANG_PORTUGUESE_BRAZILIAN)},
+    {L"pt-PT", L"Português (Portugal)",
+                               MAKELANGID(LANG_PORTUGUESE, SUBLANG_PORTUGUESE)},
+    {L"ro",    L"Română",      MAKELANGID(LANG_ROMANIAN, SUBLANG_ROMANIAN_ROMANIA)},
+    {L"ru",    L"Русский",     MAKELANGID(LANG_RUSSIAN, SUBLANG_RUSSIAN_RUSSIA)},
+    {L"sk",    L"Slovenčina",  MAKELANGID(LANG_SLOVAK, SUBLANG_SLOVAK_SLOVAKIA)},
+    {L"sv",    L"Svenska",     MAKELANGID(LANG_SWEDISH, SUBLANG_SWEDISH)},
+    {L"tr",    L"Türkçe",      MAKELANGID(LANG_TURKISH, SUBLANG_TURKISH_TURKEY)},
+    {L"uk",    L"Українська",  MAKELANGID(LANG_UKRAINIAN, SUBLANG_UKRAINIAN_UKRAINE)},
+    {L"zh-CN", L"简体中文",     MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED)},
+    {L"zh-TW", L"繁體中文",     MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL)},
+};
+
+constexpr int kLanguageCount = static_cast<int>(_countof(kLanguages));
+
 // Initialize'dan önce Str'ye gelinirse (ör. çok erken bir hata kutusu) boş metin
 // göstermek yerine kendi modülümüze düşülür.
 [[nodiscard]] HINSTANCE ModuleHandle() noexcept {
     return s_instance != nullptr ? s_instance : ::GetModuleHandleW(nullptr);
 }
 
-[[nodiscard]] LANGID ResolveLangId(const std::wstring& setting) noexcept {
-    if (_wcsicmp(setting.c_str(), L"tr") == 0) {
-        return static_cast<LANGID>(MAKELANGID(LANG_TURKISH, SUBLANG_TURKISH_TURKEY));
-    }
-    if (_wcsicmp(setting.c_str(), L"en") == 0) {
-        return static_cast<LANGID>(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
-    }
-
-    // "auto" ve tanınmayan her değer: kullanıcının arayüz dili. Alt dil (tr-TR
-    // mi tr-CY mi) önemsizdir, yalnızca birincil kimlik bakılır.
+// Kullanıcının arayüz dilinin tablodaki karşılığı. Önce TAM eşleşme aranır
+// (pt-BR ile pt-PT, zh-CN ile zh-TW yalnızca alt dille ayrışıyor), bulunamazsa
+// aynı birincil dilin ilk satırına düşülür — "de-AT" kullanıcısı Almanca alsın.
+[[nodiscard]] LANGID MatchUiLanguage() noexcept {
     const LANGID ui = ::GetUserDefaultUILanguage();
-    if (PRIMARYLANGID(ui) == LANG_TURKISH) {
-        return static_cast<LANGID>(MAKELANGID(LANG_TURKISH, SUBLANG_TURKISH_TURKEY));
+    for (const Language& lang : kLanguages) {
+        if (lang.langId == ui) {
+            return lang.langId;
+        }
     }
-    return static_cast<LANGID>(MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US));
+    for (const Language& lang : kLanguages) {
+        if (lang.langId != 0 && PRIMARYLANGID(lang.langId) == PRIMARYLANGID(ui)) {
+            return lang.langId;
+        }
+    }
+    return kEnglishUs;
+}
+
+[[nodiscard]] LANGID ResolveLangId(const std::wstring& setting) noexcept {
+    for (const Language& lang : kLanguages) {
+        if (lang.langId != 0 && _wcsicmp(setting.c_str(), lang.code) == 0) {
+            return lang.langId;
+        }
+    }
+    // "auto" ve tanınmayan her değer kullanıcının arayüz diline bakar.
+    return MatchUiLanguage();
 }
 
 // Verilen dilin RT_STRING bloğunda id'yi arar. Bulunamazsa out'a dokunmaz.
@@ -106,6 +163,39 @@ constexpr unsigned kStringsPerBlock = 16;
 }
 
 }  // namespace
+
+const Language* Languages() noexcept {
+    return kLanguages;
+}
+
+int LanguageCount() noexcept {
+    return kLanguageCount;
+}
+
+int LanguageIndex(const std::wstring& code) noexcept {
+    for (int i = 0; i < kLanguageCount; ++i) {
+        if (_wcsicmp(code.c_str(), kLanguages[i].code) == 0) {
+            return i;
+        }
+    }
+    return 0;   // "auto"
+}
+
+const wchar_t* LanguageCodeAt(int index) noexcept {
+    if (index < 0 || index >= kLanguageCount) {
+        return kLanguages[0].code;
+    }
+    return kLanguages[index].code;
+}
+
+bool IsKnownLanguage(const std::wstring& code) noexcept {
+    for (const Language& lang : kLanguages) {
+        if (_wcsicmp(code.c_str(), lang.code) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
 
 void Initialize(HINSTANCE hInstance, const std::wstring& languageSetting) {
     s_instance = hInstance;

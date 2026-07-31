@@ -7,6 +7,8 @@
 #include <shellapi.h>
 #include <shellscalingapi.h>
 
+#include <utility>
+
 namespace kli {
 namespace MonitorUtil {
 namespace {
@@ -73,6 +75,41 @@ MonitorMetrics Active(bool primaryMonitorOnly) {
 
 MonitorMetrics ForWindow(HWND hwnd) {
     return ForHandle(::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST));
+}
+
+std::vector<HMONITOR> All() {
+    std::vector<HMONITOR> list;
+
+    // EnumDisplayMonitors geri çağrısı C bağlantılı bir fonksiyon işaretçisi
+    // ister; durum lParam ile taşınır (spec §9: global değişken yok).
+    const MONITORENUMPROC proc = [](HMONITOR mon, HDC, LPRECT, LPARAM param) -> BOOL {
+        auto* out = reinterpret_cast<std::vector<HMONITOR>*>(param);
+        if (out != nullptr && mon != nullptr) {
+            out->push_back(mon);
+        }
+        return TRUE;
+    };
+    ::EnumDisplayMonitors(nullptr, nullptr, proc, reinterpret_cast<LPARAM>(&list));
+
+    if (list.empty()) {
+        // Sayım başarısız (oturum kilidi, uzak masaüstü geçişi): tek monitörlü
+        // davranışa düşülür, çağıran boş listeyle uğraşmasın.
+        LogV(L"EnumDisplayMonitors hiçbir monitör döndürmedi — ana monitöre düşülüyor");
+        const HMONITOR primary = ::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+        list.push_back(primary);
+        return list;
+    }
+
+    // Ana monitör başa alınır: "hepsi" kipinde mevcut OSD penceresi 0. sıradaki
+    // ekrana bağlanır, tek monitörlü kurulumda hiç ek pencere açılmaz.
+    const HMONITOR primary = ::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
+    for (size_t i = 1; i < list.size(); ++i) {
+        if (list[i] == primary) {
+            std::swap(list[0], list[i]);
+            break;
+        }
+    }
+    return list;
 }
 
 bool IsPresentationOrFullscreen() {

@@ -36,10 +36,15 @@ public:
     [[nodiscard]] bool Ready() const noexcept { return m_ready; }
     [[nodiscard]] const Icon& Get(LockKey key, bool on) const noexcept;
 
+    // Klavye düzeni rozeti (madde 28). Tuş ikonlarının aksine tek hâli vardır:
+    // düzen bir açık/kapalı durumu değil bir kimliktir.
+    [[nodiscard]] const Icon& Keyboard() const noexcept;
+
     static constexpr float kBoxSize = 72.0f;
 
 private:
     Icon m_icons[kLockKeyCount * 2]{};
+    Icon m_keyboard{};
     Icon m_empty{};
     bool m_ready = false;
 };

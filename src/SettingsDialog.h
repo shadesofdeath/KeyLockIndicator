@@ -33,8 +33,22 @@ public:
     // Sistem teması değiştiğinde WinDark'a bildirilir ve kontroller yenilenir.
     void OnThemeChanged(AppTheme theme);
 
+    // Dil değiştiğinde çağrılır: etiketler, açılır liste öğeleri ve bölüm başlığı
+    // ayırıcıları yeni dile göre yeniden kurulur. Etiket metinleri yalnızca
+    // WM_INITDIALOG'da konduğu için bu çağrı olmadan açık pencere eski dilde kalır
+    // ve "değişiklikler anında uygulanır" sözü tutulmaz. Seçimler korunur.
+    void OnLanguageChanged();
+
     // Dışarıdan (tray menüsü) yapılan değişikliği kontrollere yansıtır.
     void SyncFrom(const Settings& s);
+
+    // Konum seçme kipi boyunca alt satırdaki ipucu sürükleme yönergesine döner ve
+    // "Ekrandan seç" butonu pasifleşir; kip bitince ikisi de eski hâline gelir.
+    void SetPickingHint(bool picking);
+
+    // RegisterHotKey başarısız olduğunda (kısayol başkasında) görünür uyarı;
+    // conflict=false uyarıyı temizler. Kararın sahibi App'tir, kayıt orada yapılır.
+    void SetHotkeyWarning(bool conflict);
 
 private:
     static INT_PTR CALLBACK DlgProc(HWND, UINT, WPARAM, LPARAM);
@@ -45,6 +59,17 @@ private:
     void PushFromControls();
     void UpdateValueLabels();
     void Emit();
+
+    // Aşağıdaki beşi SettingsExclude.cpp içindedir (400 satır sınırı, spec §9):
+    // istisna listesi (madde 18), içe/dışa aktarma (madde 32) ve taşınabilir kip
+    // göstergesi (madde 25). Üçü de dosya seçici / liste kutusu ile çalıştığı
+    // için aynı yerde toplandı.
+    void RefreshExcludeList();
+    void OnAddExcluded();
+    void OnRemoveExcluded();
+    void OnExportSettings();
+    void OnImportSettings();
+    void UpdateStorageLabel();
 
     HWND m_hwnd = nullptr;
     HINSTANCE m_instance = nullptr;

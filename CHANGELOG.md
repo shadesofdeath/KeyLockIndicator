@@ -5,6 +5,93 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+Every setting below defaults to the 1.0 behaviour, so an upgrading user sees no change
+until they opt in.
+
+### Added
+
+- **Nine-point position grid.** `OsdPositionMode` grew from top/middle/bottom to a full
+  3 × 3 grid; the edge margin now applies on both axes. The stored 1.0 values 0/1/2 already
+  meant top-centre / centre / bottom-centre in the new grid, so no migration is needed.
+- **Pick the position on screen.** "Pick on screen…" makes the card draggable
+  (`OsdCustomX`/`OsdCustomY`, stored as a 0–10000 ratio so it survives resolution and
+  monitor changes). Release commits, Esc or right-click cancels.
+- **Monitor target.** `MonitorTarget` replaces the primary-only flag with cursor / primary /
+  all monitors; the 1.0 flag is still migrated on read and written on save.
+- **Global hotkey.** `RegisterHotKey` + `MOD_NOREPEAT`, off by default (Ctrl+Alt+L), with a
+  visible warning when another application already owns the combination.
+- **Three OSD view modes** (`OsdViewMode`): icon + text (180 × 180 DIP, the 1.0 look and the
+  default), icon only (96 × 96 DIP) and a minimal bar (240 × 56 DIP, icon left, one line
+  right). Surface size and drawing both derive from a single metrics table, so the card can
+  never be clipped by a mismatch.
+- **Persistent badge** (`PersistentBadge`, off by default). The card stays at the chosen
+  position and tracks the key state live; dwell and animations are disabled, click-through
+  is kept, and full-screen suppression still applies (polled once a second).
+- **High contrast support.** `SPI_GETHIGHCONTRAST` is honoured: the palette is derived from
+  `COLOR_WINDOW` / `COLOR_WINDOWTEXT` / `COLOR_HIGHLIGHT`, the card becomes fully opaque, the
+  border doubles in thickness and the shadow is dropped. Tracked live via `WM_SETTINGCHANGE`.
+- **Screen reader announcements** (`AnnounceToScreenReader`, off by default). Lock changes are
+  announced with `UiaRaiseNotificationEvent` over a host provider obtained from the message
+  window; `uiautomationcore.dll` is loaded on demand so users who leave the setting off never
+  pay for it. The announcement is independent of the OSD being shown.
+- **Per-application exclusions** (`ExcludedApps`, `REG_MULTI_SZ`, empty by default). The
+  foreground executable is resolved with `GetForegroundWindow` →
+  `GetWindowThreadProcessId` → `QueryFullProcessImageNameW` and matched case-insensitively
+  against the list, right before the card is shown. The tray icon and the screen-reader
+  announcement are deliberately *not* filtered: the user asked for no card, not for no
+  information. Managed from Settings with a list box, a file picker and a Remove button.
+- **Portable mode.** If `KeyLockIndicator.ini` sits next to the executable, every setting is
+  read from and written to that file instead of `HKCU`. Registry and INI share one field
+  table and one code path (`SettingsStore`, an enum-switched value store — no class
+  hierarchy). "Start with Windows" keeps using the Run key, because that is the only
+  user-level way Windows starts a program; the Settings window states this explicitly.
+- **Import / export settings.** The same `.ini` format and the same code path as portable
+  mode, driven by `GetSaveFileNameW` / `GetOpenFileNameW`. Imported settings apply
+  immediately and refresh every control. A corrupt or partial file falls back to defaults
+  field by field instead of failing (verified against a 9 KB binary-garbage file).
+- **Keyboard layout indicator** (`WatchKeyboardLayout`, off by default). The active layout is
+  read on the existing 70 ms poll tick — no new thread, no new timer, and `KeyMonitor`'s
+  contract untouched (`LayoutMonitor` is a separate small watcher). The card shows the ISO
+  639 code plus the real layout name resolved from the `Keyboard Layouts` registry branch,
+  so "Turkish Q" and "Turkish F" are told apart. It has its own keyboard badge geometry.
+- **25 interface languages** — tr, en, de, fr, es, it, pt-BR, pt-PT, ru, uk, pl, nl, cs, sk,
+  sv, da, fi, nb, hu, ro, el, ja, ko, zh-CN, zh-TW. `Loc::Languages()` is the single source of
+  truth for the picker, the stored code and the resource lookup; each entry is listed under
+  its own endonym, and switching is live. Right-to-left languages are deliberately out of
+  scope until the layout can be mirrored properly.
+
+### Changed
+
+- **Settings window is now two columns** (596 × 294 DLU instead of 310 × 407). The single
+  column had already outgrown a 150 %-scaled 1080p work area, and this round adds four more
+  controls. `SysTabControl32` was evaluated and rejected: it draws its tab strip through
+  uxtheme, ignores `WM_CTLCOLOR*` and leaves a light grey band in dark mode — the same
+  problem already documented for `msctls_hotkey32`. Two columns fix the height (−28 %) with
+  no owner-draw code and stay closer to the dense single-page Rufus layout.
+
+### Documentation
+
+- README is now a product page rather than a developer document: icon header, badges, real
+  screenshots of the OSD in both themes and of the Settings window, a tray-icon gallery
+  (three keys × on/off × light/dark), the language list, and an honest 33-item feature
+  matrix that marks what is missing as missing.
+- Build instructions, architecture, the source-file map, the settings-value table, the
+  deviations from the specification and the measurements behind them moved to
+  `docs/DEVELOPMENT.md`, including the reasoning for not shipping an Insert/overwrite
+  indicator.
+
+### Fixed
+
+- The Settings window kept the previous theme's background when it opened with, or switched
+  to, a theme different from the last one: controls repainted but the client area was never
+  erased again. The background is now invalidated explicitly after the theme is applied.
+- The excluded-apps list box showed a white sunken frame in dark mode. The dialog manager
+  adds `WS_EX_CLIENTEDGE` to list boxes on its own and neither `DarkMode_Explorer` nor
+  `DarkMode_CFD` darkens it; the style is now removed and the frame is drawn by the
+  application in the theme colour.
+
 ## 1.0.0
 
 First release.

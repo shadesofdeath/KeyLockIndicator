@@ -226,5 +226,47 @@ HRESULT BuildScroll(ID2D1Factory1* factory, bool on, Built& out) {
     return S_OK;
 }
 
+// ---------------------------------------------------------------------------
+// Klavye düzeni rozeti — konturlu gövde + dolu tuşlar (madde 28)
+// ---------------------------------------------------------------------------
+//
+// Kilit tuşu ikonlarıyla aynı görsel dilde durur: dış hat 2 DIP kontur, iç
+// öğeler dolu. Tuş ızgarası bilerek 4-4-boşluk düzenindedir; daha fazla tuş
+// 32 DIP'lik çubuk kipinde lapa gibi görünüyordu (ölçüldü, bkz. OsdMetrics.h
+// iconBox değerleri).
+HRESULT BuildKeyboard(ID2D1Factory1* factory, Built& out) {
+    if (!factory) {
+        return E_INVALIDARG;
+    }
+    out = Built{};
+    out.strokeWidth = 2.0f;
+
+    ComPtr<ID2D1Geometry> frame;
+    HR(MakeRoundedRect(factory, 6.0f, 17.0f, 66.0f, 57.0f, 7.0f, &frame));
+    out.stroke = frame;
+
+    // Üst iki sıra dörder tuş, altta boşluk çubuğu. Koordinatlar sol/üst/sağ/alt.
+    constexpr float kKeys[][4] = {
+        {13.0f, 24.0f, 21.0f, 30.0f}, {25.0f, 24.0f, 33.0f, 30.0f},
+        {37.0f, 24.0f, 45.0f, 30.0f}, {49.0f, 24.0f, 57.0f, 30.0f},
+        {13.0f, 33.0f, 21.0f, 39.0f}, {25.0f, 33.0f, 33.0f, 39.0f},
+        {37.0f, 33.0f, 45.0f, 39.0f}, {49.0f, 33.0f, 57.0f, 39.0f},
+        {21.0f, 42.0f, 49.0f, 48.0f},   // boşluk çubuğu
+    };
+    constexpr size_t kKeyCount = _countof(kKeys);
+
+    ComPtr<ID2D1Geometry> keys[kKeyCount];
+    ID2D1Geometry* items[kKeyCount]{};
+    for (size_t i = 0; i < kKeyCount; ++i) {
+        HR(MakeRoundedRect(factory, kKeys[i][0], kKeys[i][1], kKeys[i][2], kKeys[i][3],
+                           2.0f, &keys[i]));
+        items[i] = keys[i].Get();
+    }
+
+    HR(Group(factory, items, static_cast<UINT>(kKeyCount), D2D1_FILL_MODE_WINDING,
+             &out.fill));
+    return S_OK;
+}
+
 }  // namespace IconShapes
 }  // namespace kli

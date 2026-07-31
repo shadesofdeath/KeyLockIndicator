@@ -28,7 +28,8 @@ struct Entry {
 // Üretimin tamamı; herhangi bir adım başarısızsa çağıran Reset() yapar. Ayrı
 // bir fonksiyon olması HR() makrosunun erken çıkışını kullanabilmek içindir
 // (başlık sabit olduğu için özel üye fonksiyon eklenemez).
-HRESULT BuildAll(ID2D1Factory1* factory, IconGeometry::Icon* icons) {
+HRESULT BuildAll(ID2D1Factory1* factory, IconGeometry::Icon* icons,
+                 IconGeometry::Icon& keyboard) {
     const Entry kEntries[] = {
         {LockKey::Caps, &IconShapes::BuildCaps},
         {LockKey::Num, &IconShapes::BuildNum},
@@ -58,6 +59,16 @@ HRESULT BuildAll(ID2D1Factory1* factory, IconGeometry::Icon* icons) {
             icon.strokeWidth = built.strokeWidth;
         }
     }
+
+    // Klavye rozeti tablonun dışındadır: LockKey ile eşleşmez ve durum hâli yok.
+    IconShapes::Built kb;
+    HR(IconShapes::BuildKeyboard(factory, kb));
+    if (!kb.fill && !kb.stroke) {
+        return E_FAIL;
+    }
+    keyboard.fill = kb.fill;
+    keyboard.stroke = kb.stroke;
+    keyboard.strokeWidth = kb.strokeWidth;
     return S_OK;
 }
 
@@ -69,7 +80,7 @@ HRESULT IconGeometry::Initialize(ID2D1Factory1* factory) {
         return E_INVALIDARG;
     }
 
-    const HRESULT hr = BuildAll(factory, m_icons);
+    const HRESULT hr = BuildAll(factory, m_icons, m_keyboard);
     if (FAILED(hr)) {
         Reset();  // yarım kalmış önbellek bırakma
         return hr;
@@ -85,7 +96,17 @@ void IconGeometry::Reset() {
         icon.stroke.Reset();
         icon.strokeWidth = 2.0f;
     }
+    m_keyboard.fill.Reset();
+    m_keyboard.stroke.Reset();
+    m_keyboard.strokeWidth = 2.0f;
     m_ready = false;
+}
+
+const IconGeometry::Icon& IconGeometry::Keyboard() const noexcept {
+    if (!m_ready || (!m_keyboard.fill && !m_keyboard.stroke)) {
+        return m_empty;
+    }
+    return m_keyboard;
 }
 
 const IconGeometry::Icon& IconGeometry::Get(LockKey key, bool on) const noexcept {
