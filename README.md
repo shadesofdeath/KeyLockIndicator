@@ -15,7 +15,13 @@ on screen — the moment they change.
 ![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C?style=flat-square&logo=cplusplus&logoColor=white)
 ![Win32](https://img.shields.io/badge/Win32-native-1a1a1a?style=flat-square)
 ![No dependencies](https://img.shields.io/badge/dependencies-none-2ea44f?style=flat-square)
+![MSIX](https://img.shields.io/badge/MSIX-Store%20ready-2ea44f?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-1a1a1a?style=flat-square)
+
+<br>
+
+**[Install](#install)** · **[Features](#features)** · **[Languages](#languages)** ·
+**[Build](docs/DEVELOPMENT.md)** · **[Publish](docs/STORE.md)**
 
 </div>
 
@@ -115,8 +121,8 @@ at any scale.
   setting lives in that file instead of the registry
 - **Take your settings with you** — export and import the same `.ini` from the
   Settings window
-- **Feather-light** — a single statically linked file, and it releases its GPU
-  resources while idle
+- **Feather-light** — one statically linked 495 KB file, no runtime to install,
+  and it releases its GPU resources while idle
 
 <br>
 
@@ -195,19 +201,40 @@ Svenska · Türkçe · Українська · 简体中文 · 繁體中文
 
 ## Install
 
+### The ZIP
+
 1. Download the latest ZIP from [Releases](../../releases)
 2. Unzip it anywhere
 3. Run `KeyLockIndicator.exe`
 
-That is the whole thing. It is portable — no installer, nothing left behind.
+That is the whole thing. No installer, no runtime, nothing left behind.
 Right-click the tray icon for Settings, or to start it with Windows.
 
-**Want it fully portable?** Create an empty file called `KeyLockIndicator.ini`
-next to `KeyLockIndicator.exe`. Every setting is then read from and written to
-that file, so the whole app travels on a USB stick. The Settings window always
-tells you which of the two it is using. ("Start with Windows" still uses the
-registry — that is how Windows starts programs, and there is no file-based
-equivalent; unticking the box removes the entry again.)
+### The MSIX package
+
+The same source builds a Store package. It carries the identical binary — the
+only difference is what happens under the hood: autostart goes through
+`windows.startupTask` instead of the `Run` key, and settings live in the
+package's private registry hive, so uninstalling really does remove everything.
+
+```powershell
+tools\make_msix.ps1 -Register    # try it locally — no certificate, no admin
+tools\make_msix.ps1 -Store       # the package you upload to Partner Center
+```
+
+The whole submission path — identity values, `runFullTrust` justification,
+certification traps — is written up in **[docs/STORE.md](docs/STORE.md)**.
+
+### Fully portable
+
+Create an empty file called `KeyLockIndicator.ini` next to
+`KeyLockIndicator.exe`. Every setting is then read from and written to that
+file, so the whole app travels on a USB stick. The Settings window always tells
+you which of the two it is using.
+
+("Start with Windows" still uses the registry — that is how Windows starts
+programs, and there is no file-based equivalent; unticking the box removes the
+entry again.)
 
 <br>
 
@@ -223,8 +250,9 @@ equivalent; unticking the box removes the entry again.)
 <div align="center">
 <sub>
 
-Building from source, architecture and measurements:
-**[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**
+Building from source, architecture and measurements: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**
+<br>
+Packaging and Microsoft Store submission: **[docs/STORE.md](docs/STORE.md)**
 
 MIT licensed · © 2026 ShadesOfDeath
 

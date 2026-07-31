@@ -33,10 +33,33 @@ cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build/release
 ```
 
-Output: `build/release/KeyLockIndicator.exe`.
+Output: `build/Release/KeyLockIndicator.exe`.
 
-Add `-DKLI_PACKAGED=ON` for the MSIX variant, which uses `windows.startupTask`
-instead of the `Run` key for autostart. `cpack` produces the portable ZIP.
+`cpack` produces the portable ZIP (`tools\build.ps1 -Config Release -Package`).
+
+### The packaged variant
+
+`-DKLI_PACKAGED=ON` builds the MSIX variant, which uses `windows.startupTask`
+instead of the `Run` key for autostart and links `runtimeobject` for the
+`StartupTask` WinRT calls:
+
+```powershell
+tools\build.ps1 -Config Release -Packaged
+```
+
+It lands in **`build/Release-msix/`**, deliberately separate from the portable
+build. Sharing one directory meant that toggling `-Packaged` silently swapped
+which binary sat at `build/Release/KeyLockIndicator.exe`, with no way to tell
+them apart without running one — and it made packaging impossible while the
+portable build was open in the tray.
+
+Both variants are the same code. `Autostart::SelectBackend()` picks the backend
+from a compile-time flag *and* a runtime `GetCurrentPackageFullName()` check, so
+a packaged build launched unpackaged (CI, debugging) still falls back to the
+`Run` key correctly.
+
+Packaging the result into an `.msix` is `tools\make_msix.ps1`; see
+[STORE.md](STORE.md).
 
 Compiler settings: `/std:c++20 /permissive- /W4 /MT`, static CRT, LTCG,
 `/OPT:REF /OPT:ICF`. **The build must stay warning-free at `/W4`;**
@@ -311,3 +334,27 @@ inspection. Highlights from the last full pass:
 - Settings round-trip verified per field: registry → dialog → registry → reopen.
 
 Three defects found this way during 1.0, all listed above as deviations 6–8.
+
+### The MSIX package
+
+Checked the same way — by installing it, not by reading the manifest:
+
+- `tools\build.ps1 -Config Release -Packaged` links clean at `/W4`. The packaged
+  binary is 497.5 KB against the portable build's 494.5 KB — `runtimeobject` and
+  the raw WinRT ABI glue cost 3 KB, which is why the `StartupTask` path is
+  compiled in rather than split into a second product.
+- `makepri` indexes all 45 assets into a 3.3 KB `resources.pri`; `makeappx`
+  produces a 417 KB `.msix`.
+- Registered with `Add-AppxPackage -Register` under Developer Mode and launched
+  through `shell:appsFolder`. `GetPackageFamilyName` on the running process
+  returns `ShadesOfDeath.KeyLockIndicator_…`, so `Autostart::IsPackaged()` is
+  true and `SelectBackend()` takes the `StartupTask` branch — the packaged path
+  is genuinely exercised, not merely compiled.
+- Windows registered the startup task under
+  `…\AppModel\SystemAppData\<family>\KeyLockIndicatorStartup`, confirming the
+  manifest's `TaskId` matches `Autostart::kStartupTaskId`. That pair is the one
+  silent-failure mode in the packaged build: a mismatch makes the autostart
+  checkbox do nothing, with no error anywhere.
+
+Not yet run: the Windows App Certification Kit, which needs an elevated prompt.
+The command is in [STORE.md](STORE.md).

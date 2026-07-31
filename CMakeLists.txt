@@ -104,6 +104,40 @@ add_executable(keylock-indicator WIN32
     res/app.rc
 )
 
+# app.rc, res/icons altındaki .ico dosyalarını gömer ama CMake'in RC bağımlılık
+# taraması bunları görmez: simgeler değiştiğinde ninja "no work to do" der ve
+# ESKİ simgeler exe'de kalır. Hata sessizdir — derleme başarılı görünür, yalnızca
+# ürün yanlıştır; MSIX paketi bu yüzden bir kez eski simgelerle üretildi.
+# OBJECT_DEPENDS bağımlılığı açıkça bildirir (Ninja ve Makefile üreticilerinde
+# geçerlidir).
+set(KLI_ICON_FILES
+    res/icons/app.ico
+    res/icons/tray_caps_off_dark.ico
+    res/icons/tray_caps_off_light.ico
+    res/icons/tray_caps_on_dark.ico
+    res/icons/tray_caps_on_light.ico
+    res/icons/tray_num_off_dark.ico
+    res/icons/tray_num_off_light.ico
+    res/icons/tray_num_on_dark.ico
+    res/icons/tray_num_on_light.ico
+    res/icons/tray_scroll_off_dark.ico
+    res/icons/tray_scroll_off_light.ico
+    res/icons/tray_scroll_on_dark.ico
+    res/icons/tray_scroll_on_light.ico
+)
+list(TRANSFORM KLI_ICON_FILES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+
+# strings*.rc dosyaları app.rc içinden #include edilir; RC taraması onları
+# çoğunlukla yakalar, ama simgelerle aynı garantiye bağlamak bedava.
+set_property(SOURCE res/app.rc APPEND PROPERTY OBJECT_DEPENDS
+    ${KLI_ICON_FILES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/strings.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/strings_core.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/strings_west.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/strings_east.rc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/res/strings_asia.rc"
+)
+
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${KLI_SOURCES} ${KLI_HEADERS})
 
 target_include_directories(keylock-indicator PRIVATE
