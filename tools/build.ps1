@@ -134,7 +134,18 @@ function Resolve-Tool {
 # ---------------------------------------------------------------------------
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$buildDir = Join-Path (Join-Path $repoRoot 'build') $Config
+
+# Paketli ve taşınabilir derlemeler AYRI dizinlerde tutulur. Aynı dizini
+# paylaşsalardı -Packaged açılıp kapandığında CMake önbelleği yeniden
+# yapılandırılır ve build\Release\KeyLockIndicator.exe sessizce diğer türle
+# değişirdi; hangi ikilinin elde olduğu ancak çalıştırınca anlaşılırdı.
+# Ayrıca taşınabilir derleme tepside açıkken MSIX derlemesi yapılabilir.
+if ($Packaged) {
+    $buildDir = Join-Path (Join-Path $repoRoot 'build') "$Config-msix"
+}
+else {
+    $buildDir = Join-Path (Join-Path $repoRoot 'build') $Config
+}
 
 Write-Host 'KeyLock Indicator — derleme' -ForegroundColor Green
 Write-Host "  Kök       : $repoRoot"

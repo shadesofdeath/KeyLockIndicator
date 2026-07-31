@@ -342,18 +342,52 @@ foreach ($key in 'caps', 'num', 'scroll') {
     }
 }
 
-$assets = @(
-    @{ Name = 'Square44x44Logo.png';                                  W =  44; H =  44 },
-    @{ Name = 'Square44x44Logo.targetsize-24_altform-unplated.png';   W =  24; H =  24 },
-    @{ Name = 'Square71x71Logo.png';                                  W =  71; H =  71 },
-    @{ Name = 'Square150x150Logo.png';                                W = 150; H = 150 },
-    @{ Name = 'Square310x310Logo.png';                                W = 310; H = 310 },
-    @{ Name = 'Wide310x150Logo.png';                                  W = 310; H = 150 },
-    @{ Name = 'StoreLogo.png';                                        W =  50; H =  50 },
-    @{ Name = 'SplashScreen.png';                                     W = 620; H = 300 }
+# --- MSIX görselleri ---------------------------------------------------------
+# Her görsel bir TABAN dosya (ölçeksiz ad) ve ölçek çeşitleriyle üretilir.
+# Windows kutucuğu 125/150/200/400 DPI'da ".scale-N" dosyasını seçer; yoksa
+# ölçek-100'ü büyütür ve kenarlar bulanıklaşır. Taban dosyanın ölçeksiz adla da
+# durması bilinçlidir: AppxManifest görselleri o adla gösterir, böylece paket
+# resources.pri olmadan da geçerli kalır (PRI yalnızca çeşitleri devreye sokar).
+$AssetBases = @(
+    @{ Name = 'Square44x44Logo';   W =  44; H =  44 },
+    @{ Name = 'Square71x71Logo';   W =  71; H =  71 },
+    @{ Name = 'Square150x150Logo'; W = 150; H = 150 },
+    @{ Name = 'Square310x310Logo'; W = 310; H = 310 },
+    @{ Name = 'Wide310x150Logo';   W = 310; H = 150 },
+    @{ Name = 'StoreLogo';         W =  50; H =  50 },
+    @{ Name = 'SplashScreen';      W = 620; H = 300 }
 )
-foreach ($a in $assets) {
-    Write-LogoPng -Path (Join-Path $assetDir $a.Name) -Width $a.W -Height $a.H
+
+$AssetScales = @(125, 150, 200, 400)
+
+# Görev çubuğu, Başlat listesi ve Alt+Tab 44x44 görselini piksel hedefine göre
+# seçer. "unplated": kabuk arkaya kendi plakasını KOYMAZ, simge doğrudan çizilir
+# — bizim görselimiz zaten kendi accent plakasını taşıdığı için doğru çeşit
+# budur ve iki ad da aynı çizimden üretilir.
+$TargetSizes = @(16, 24, 32, 48, 256)
+
+# .NET'in varsayılan yuvarlaması bankacı yuvarlamasıdır (62,5 → 62). Windows'un
+# beklediği değerler yukarı yuvarlamayla gelir: 50 → 63, 71 → 89, 150 → 188.
+function Get-ScaledPx {
+    param([int]$Base, [int]$Scale)
+    return [int][math]::Round($Base * $Scale / 100.0, 0, [MidpointRounding]::AwayFromZero)
+}
+
+foreach ($a in $AssetBases) {
+    Write-LogoPng -Path (Join-Path $assetDir "$($a.Name).png") -Width $a.W -Height $a.H
+
+    foreach ($s in $AssetScales) {
+        Write-LogoPng -Path (Join-Path $assetDir "$($a.Name).scale-$s.png") `
+                      -Width  (Get-ScaledPx -Base $a.W -Scale $s) `
+                      -Height (Get-ScaledPx -Base $a.H -Scale $s)
+    }
+}
+
+foreach ($t in $TargetSizes) {
+    Write-LogoPng -Path (Join-Path $assetDir "Square44x44Logo.targetsize-$t.png") `
+                  -Width $t -Height $t
+    Write-LogoPng -Path (Join-Path $assetDir "Square44x44Logo.targetsize-${t}_altform-unplated.png") `
+                  -Width $t -Height $t
 }
 
 # --- Rapor -------------------------------------------------------------------

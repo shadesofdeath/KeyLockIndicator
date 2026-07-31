@@ -25,8 +25,16 @@
     Square310x310Logo.png  310 x 310    Büyük kutucuk
     Wide310x150Logo.png    310 x 150    Geniş kutucuk
     SplashScreen.png       620 x 300    Açılış görseli
-  MakeAppx, aynı adın ".scale-100/125/150/200/400" ekli ölçek çeşitlerini de
-  otomatik toplar; yalnızca ölçek-100 dosyaları zorunludur.
+  Her biri ayrıca ".scale-125/150/200/400" çeşitleriyle, Square44x44Logo ise
+  ".targetsize-16/24/32/48/256" (+ "_altform-unplated") çeşitleriyle üretilir.
+  Çeşitleri kabuğa bağlayan şey resources.pri'dir; tools/make_msix.ps1 onu
+  makepri ile paketleme sırasında üretir.
+
+  BU DOSYA DOĞRUDAN GÖNDERİLMEZ. tools/make_msix.ps1 paketleme sırasında
+  Identity/@Name, @Publisher, @Version ve @ProcessorArchitecture alanlarını
+  parametrelerden yazar; aşağıdaki değerler yalnızca yerel test içindir.
+  Store gönderiminde Partner Center'daki gerçek değerler kullanılır —
+  ayrıntı için docs/STORE.md.
 -->
 
 <Package
@@ -60,10 +68,39 @@
         MaxVersionTested="10.0.26100.0" />
   </Dependencies>
 
-  <!-- İkilinin içindeki çift dilli STRINGTABLE ile aynı diller (spec §7). -->
+  <!-- İkilinin içindeki STRINGTABLE kümeleriyle aynı 25 dil (spec §7); tek
+       doğruluk kaynağı src/Localization.cpp içindeki kLanguages tablosudur.
+       İLK SATIR VARSAYILAN DİLDİR: uygulamanın garanti geri düşüşü EN olduğu
+       için en-US başta durur. Çince'de kabuk bölge değil yazı sistemi bekler,
+       bu yüzden zh-CN/zh-TW yerine zh-Hans/zh-Hant yazılır.
+       Buradaki liste Store listelemesinde "desteklenen diller" olarak görünür;
+       eksik bırakılırsa uygulama o dillerde aranamaz. -->
   <Resources>
-    <Resource Language="tr-TR" />
     <Resource Language="en-US" />
+    <Resource Language="cs" />
+    <Resource Language="da" />
+    <Resource Language="de" />
+    <Resource Language="el" />
+    <Resource Language="es" />
+    <Resource Language="fi" />
+    <Resource Language="fr" />
+    <Resource Language="hu" />
+    <Resource Language="it" />
+    <Resource Language="ja" />
+    <Resource Language="ko" />
+    <Resource Language="nb" />
+    <Resource Language="nl" />
+    <Resource Language="pl" />
+    <Resource Language="pt-BR" />
+    <Resource Language="pt-PT" />
+    <Resource Language="ro" />
+    <Resource Language="ru" />
+    <Resource Language="sk" />
+    <Resource Language="sv" />
+    <Resource Language="tr" />
+    <Resource Language="uk" />
+    <Resource Language="zh-Hans" />
+    <Resource Language="zh-Hant" />
   </Resources>
 
   <Applications>
@@ -74,10 +111,15 @@
 
       <!-- BackgroundColor="transparent": kutucuk arkaplanı sistem vurgu
            rengini alır, ikonun kendi zemini olmaz. AppListEntry belirtilmez;
-           varsayılan "default" ile uygulama listesinde görünür. -->
+           varsayılan "default" ile uygulama listesinde görünür.
+
+           Bu iki metin KABUĞUN gösterdiği metinlerdir (Başlat, Ayarlar >
+           Uygulamalar) ve varsayılan dil en-US olduğu için İngilizcedir.
+           Uygulamanın KENDİ arayüzü çalışma zamanında 25 dile çevrilir; oradaki
+           metinler res/strings_*.rc dosyalarından gelir, buradan değil. -->
       <uap:VisualElements
           DisplayName="KeyLock Indicator"
-          Description="Caps Lock, Num Lock ve Scroll Lock durumunu ekranda gösterir."
+          Description="Shows Caps Lock, Num Lock and Scroll Lock on screen the moment they change."
           BackgroundColor="transparent"
           Square150x150Logo="Assets\Square150x150Logo.png"
           Square44x44Logo="Assets\Square44x44Logo.png">
